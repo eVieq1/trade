@@ -14,7 +14,8 @@ import java.util.concurrent.Executors;
 import org.json.JSONObject;
 
 public class ApiClient {
-    private static final String BASE_URL = "http://vanemya8.beget.tech/public_html/sales_api/";
+    // ПРАВИЛЬНЫЙ ПУТЬ (без public_html)
+    private static final String BASE_URL = "http://vanemya8.beget.tech/sales_api/";
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -24,6 +25,7 @@ public class ApiClient {
         void onError(String error);
     }
 
+    // ==================== МЕТОД ДЛЯ ПРОДАЖ ====================
     public void addSale(String employee, String product, double amount, boolean isSampling, String phoneModel, ApiCallback callback) {
         executor.execute(new Runnable() {
             @Override
@@ -44,13 +46,13 @@ public class ApiClient {
                     conn.setReadTimeout(15000);
 
                     OutputStream os = conn.getOutputStream();
-                    os.write(json.getBytes());
+                    os.write(json.getBytes("UTF-8"));
                     os.close();
 
                     final int responseCode = conn.getResponseCode();
 
                     if (responseCode == 200) {
-                        Scanner s = new Scanner(conn.getInputStream()).useDelimiter("\\A");
+                        Scanner s = new Scanner(conn.getInputStream(), "UTF-8").useDelimiter("\\A");
                         final String response = s.hasNext() ? s.next() : "";
                         handler.post(new Runnable() {
                             @Override
@@ -59,17 +61,10 @@ public class ApiClient {
                             }
                         });
                     } else {
-                        String errorMsg = "";
-                        if (conn.getErrorStream() != null) {
-                            Scanner s = new Scanner(conn.getErrorStream()).useDelimiter("\\A");
-                            errorMsg = s.hasNext() ? s.next() : "";
-                        }
-                        final String finalErrorMsg = errorMsg;
-                        final int finalCode = responseCode;
                         handler.post(new Runnable() {
                             @Override
                             public void run() {
-                                callback.onError("HTTP ошибка: " + finalCode + " - " + finalErrorMsg);
+                                callback.onError("HTTP ошибка: " + responseCode);
                             }
                         });
                     }
@@ -88,13 +83,18 @@ public class ApiClient {
         });
     }
 
+    // ==================== МЕТОД ДЛЯ ПРОВЕРКИ СОТРУДНИКА ====================
     public void checkEmployee(String name, ApiCallback callback) {
         executor.execute(new Runnable() {
             @Override
             public void run() {
                 HttpURLConnection conn = null;
                 try {
-                    final String urlString = BASE_URL + "check_employee.php?name=" + URLEncoder.encode(name, "UTF-8");
+                    // ✅ КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: кодируем кириллицу
+                    String encodedName = URLEncoder.encode(name, "UTF-8");
+                    final String urlString = BASE_URL + "check_employee.php?name=" + encodedName;
+                    Log.d("ApiClient", "Запрос: " + urlString);
+
                     URL url = new URL(urlString);
                     conn = (HttpURLConnection) url.openConnection();
                     conn.setRequestMethod("GET");
@@ -102,10 +102,12 @@ public class ApiClient {
                     conn.setReadTimeout(15000);
 
                     final int responseCode = conn.getResponseCode();
+                    Log.d("ApiClient", "Response code: " + responseCode);
 
                     if (responseCode == 200) {
-                        Scanner s = new Scanner(conn.getInputStream()).useDelimiter("\\A");
+                        Scanner s = new Scanner(conn.getInputStream(), "UTF-8").useDelimiter("\\A");
                         final String response = s.hasNext() ? s.next() : "";
+                        Log.d("ApiClient", "Ответ: " + response);
                         handler.post(new Runnable() {
                             @Override
                             public void run() {
@@ -115,23 +117,24 @@ public class ApiClient {
                     } else {
                         String errorMsg = "";
                         if (conn.getErrorStream() != null) {
-                            Scanner s = new Scanner(conn.getErrorStream()).useDelimiter("\\A");
+                            Scanner s = new Scanner(conn.getErrorStream(), "UTF-8").useDelimiter("\\A");
                             errorMsg = s.hasNext() ? s.next() : "";
                         }
                         final String finalErrorMsg = errorMsg;
                         handler.post(new Runnable() {
                             @Override
                             public void run() {
-                                callback.onError("HTTP ошибка: " + responseCode + " - " + finalErrorMsg);
+                                callback.onError("HTTP " + responseCode + ": " + finalErrorMsg);
                             }
                         });
                     }
                 } catch (Exception e) {
                     final String error = e.getMessage();
+                    Log.e("ApiClient", "Ошибка: " + error);
                     handler.post(new Runnable() {
                         @Override
                         public void run() {
-                            callback.onError(error);
+                            callback.onError("Ошибка: " + error);
                         }
                     });
                 } finally {
@@ -141,6 +144,7 @@ public class ApiClient {
         });
     }
 
+    // ==================== МЕТОД ДЛЯ СОХРАНЕНИЯ ПЛАНОВ ====================
     public void savePlan(int year, int month, String category, double target, String unitType, ApiCallback callback) {
         executor.execute(new Runnable() {
             @Override
@@ -163,13 +167,13 @@ public class ApiClient {
                     conn.setReadTimeout(15000);
 
                     OutputStream os = conn.getOutputStream();
-                    os.write(json.toString().getBytes());
+                    os.write(json.toString().getBytes("UTF-8"));
                     os.close();
 
                     final int responseCode = conn.getResponseCode();
 
                     if (responseCode == 200) {
-                        Scanner s = new Scanner(conn.getInputStream()).useDelimiter("\\A");
+                        Scanner s = new Scanner(conn.getInputStream(), "UTF-8").useDelimiter("\\A");
                         final String response = s.hasNext() ? s.next() : "";
                         handler.post(new Runnable() {
                             @Override
@@ -200,6 +204,7 @@ public class ApiClient {
         });
     }
 
+    // ==================== МЕТОД ДЛЯ ПОЛУЧЕНИЯ ДАННЫХ ОТЧЁТА ====================
     public void getReportData(String startDate, String endDate, ApiCallback callback) {
         executor.execute(new Runnable() {
             @Override
@@ -216,7 +221,7 @@ public class ApiClient {
                     final int responseCode = conn.getResponseCode();
 
                     if (responseCode == 200) {
-                        Scanner s = new Scanner(conn.getInputStream()).useDelimiter("\\A");
+                        Scanner s = new Scanner(conn.getInputStream(), "UTF-8").useDelimiter("\\A");
                         final String response = s.hasNext() ? s.next() : "";
                         handler.post(new Runnable() {
                             @Override
@@ -247,6 +252,7 @@ public class ApiClient {
         });
     }
 
+    // ==================== МЕТОД ДЛЯ СОХРАНЕНИЯ ГРАФИКА ====================
     public void saveSchedule(int year, int month, int day, String employee, String shiftTime, ApiCallback callback) {
         executor.execute(new Runnable() {
             @Override
@@ -269,13 +275,13 @@ public class ApiClient {
                     conn.setReadTimeout(15000);
 
                     OutputStream os = conn.getOutputStream();
-                    os.write(json.toString().getBytes());
+                    os.write(json.toString().getBytes("UTF-8"));
                     os.close();
 
                     final int responseCode = conn.getResponseCode();
 
                     if (responseCode == 200) {
-                        Scanner s = new Scanner(conn.getInputStream()).useDelimiter("\\A");
+                        Scanner s = new Scanner(conn.getInputStream(), "UTF-8").useDelimiter("\\A");
                         final String response = s.hasNext() ? s.next() : "";
                         handler.post(new Runnable() {
                             @Override
@@ -306,6 +312,7 @@ public class ApiClient {
         });
     }
 
+    // ==================== МЕТОД ДЛЯ ПОЛУЧЕНИЯ ГРАФИКА ====================
     public void getSchedule(int year, int month, ApiCallback callback) {
         executor.execute(new Runnable() {
             @Override
@@ -323,7 +330,7 @@ public class ApiClient {
                     final int responseCode = conn.getResponseCode();
 
                     if (responseCode == 200) {
-                        Scanner s = new Scanner(conn.getInputStream()).useDelimiter("\\A");
+                        Scanner s = new Scanner(conn.getInputStream(), "UTF-8").useDelimiter("\\A");
                         final String response = s.hasNext() ? s.next() : "";
                         handler.post(new Runnable() {
                             @Override
@@ -332,16 +339,10 @@ public class ApiClient {
                             }
                         });
                     } else {
-                        String errorMsg = "";
-                        if (conn.getErrorStream() != null) {
-                            Scanner s = new Scanner(conn.getErrorStream()).useDelimiter("\\A");
-                            errorMsg = s.hasNext() ? s.next() : "";
-                        }
-                        final String finalErrorMsg = errorMsg;
                         handler.post(new Runnable() {
                             @Override
                             public void run() {
-                                callback.onError("HTTP " + responseCode + ": " + finalErrorMsg);
+                                callback.onError("HTTP " + responseCode);
                             }
                         });
                     }
