@@ -6,13 +6,11 @@
     android:orientation="vertical"
     android:background="#F5F5F5">
 
-    <!-- Верхняя панель с меню -->
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
-        android:background="#2196F3"
-        android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar">
+        android:background="#2196F3">
 
         <TextView
             android:id="@+id/tvTitle"
@@ -23,6 +21,19 @@
             android:textStyle="bold"
             android:textColor="#FFFFFF"
             android:layout_gravity="center" />
+
+        <TextView
+            android:id="@+id/btnMenu"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:text="⋮"
+            android:textSize="24sp"
+            android:textColor="#FFFFFF"
+            android:gravity="center"
+            android:layout_gravity="end"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="Меню" />
 
     </androidx.appcompat.widget.Toolbar>
 
@@ -37,6 +48,6 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         app:menu="@menu/bottom_nav_menu"
-        app:labelVisibilityMode="unlabeled" />
+        app:labelVisibilityMode="labeled" />
 
 </LinearLayout>

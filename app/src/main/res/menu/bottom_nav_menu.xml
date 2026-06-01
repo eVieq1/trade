@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/nav_sales"
+        android:icon="@android:drawable/ic_menu_edit"
+        android:title="Продажи" />
+    <item
+        android:id="@+id/nav_schedule"
+        android:icon="@android:drawable/ic_menu_edit"
+        android:title="Графики" />
+    <item
+        android:id="@+id/nav_reports"
+        android:icon="@android:drawable/ic_menu_edit"
+        android:title="Отчёты" />
+    <item
+        android:id="@+id/nav_rating"
+        android:icon="@android:drawable/ic_menu_edit"
+        android:title="Рейтинг" />
+</menu>
