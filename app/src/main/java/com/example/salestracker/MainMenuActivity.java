@@ -33,7 +33,9 @@ public class MainMenuActivity extends AppCompatActivity {
 
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
-        getSupportActionBar().setDisplayShowTitleEnabled(false);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayShowTitleEnabled(false);
+        }
 
         tvToolbarTitle = findViewById(R.id.tvToolbarTitle);
         viewPager = findViewById(R.id.viewPager);
@@ -75,10 +77,18 @@ public class MainMenuActivity extends AppCompatActivity {
             @Override
             public void onPageSelected(int position) {
                 switch (position) {
-                    case 0: bottomNavigation.setSelectedItemId(R.id.nav_sales); break;
-                    case 1: bottomNavigation.setSelectedItemId(R.id.nav_schedule); break;
-                    case 2: bottomNavigation.setSelectedItemId(R.id.nav_reports); break;
-                    case 3: bottomNavigation.setSelectedItemId(R.id.nav_rating); break;
+                    case 0:
+                        bottomNavigation.setSelectedItemId(R.id.nav_sales);
+                        break;
+                    case 1:
+                        bottomNavigation.setSelectedItemId(R.id.nav_schedule);
+                        break;
+                    case 2:
+                        bottomNavigation.setSelectedItemId(R.id.nav_reports);
+                        break;
+                    case 3:
+                        bottomNavigation.setSelectedItemId(R.id.nav_rating);
+                        break;
                 }
                 tvToolbarTitle.setText(titles[position]);
             }
@@ -88,28 +98,53 @@ public class MainMenuActivity extends AppCompatActivity {
     }
 
     private void showMenuDialog() {
-        String[] items = {"Изменить планы", "Редактировать смену", "Выход"};
+        int currentTab = viewPager.getCurrentItem();
+        String[] items;
+        String title = "Меню";
+
+        if (currentTab == 0) { // Продажи
+            Toast.makeText(this, "Меню недоступно на этой вкладке", Toast.LENGTH_SHORT).show();
+            return;
+        } else if (currentTab == 1) { // Графики
+            // ДОБАВЛЕНА КНОПКА "ОБНОВИТЬ"
+            items = new String[]{"Редактировать смену", "Обновить", "Выход"};
+            title = "Графики";
+        } else if (currentTab == 2) { // Отчёты
+            items = new String[]{"Изменить планы", "Выход"};
+            title = "Отчёты";
+        } else { // Рейтинг
+            Toast.makeText(this, "Меню недоступно на этой вкладке", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
         new AlertDialog.Builder(this)
-                .setTitle("Меню")
+                .setTitle(title)
                 .setItems(items, (dialog, which) -> {
-                    if (which == 0) {
+                    if (items[which].equals("Редактировать смену")) {
+                        Fragment currentFragment = getSupportFragmentManager()
+                                .findFragmentByTag("f" + viewPager.getCurrentItem());
+                        if (currentFragment instanceof ScheduleFragment) {
+                            ((ScheduleFragment) currentFragment).showEditDialog();
+                        } else {
+                            Toast.makeText(this, "Ошибка: фрагмент не найден", Toast.LENGTH_SHORT).show();
+                        }
+                    } else if (items[which].equals("Обновить")) {
+                        // ОБНОВЛЕНИЕ ДАННЫХ НА СТРАНИЦЕ ГРАФИКОВ
+                        Fragment currentFragment = getSupportFragmentManager()
+                                .findFragmentByTag("f" + viewPager.getCurrentItem());
+                        if (currentFragment instanceof ScheduleFragment) {
+                            ((ScheduleFragment) currentFragment).refreshData();
+                            Toast.makeText(this, "🔄 Данные обновлены", Toast.LENGTH_SHORT).show();
+                        }
+                    } else if (items[which].equals("Изменить планы")) {
                         SharedPreferences prefs = getSharedPreferences("app", MODE_PRIVATE);
                         String userRole = prefs.getString("user_role", "seller");
                         if (userRole.equals("dm")) {
                             startActivity(new Intent(MainMenuActivity.this, PlanSettingsActivity.class));
                         } else {
-                            Toast.makeText(MainMenuActivity.this, "Доступ только для директора", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(this, "Доступ только для директора", Toast.LENGTH_SHORT).show();
                         }
-                    } else if (which == 1) {
-                        // Получаем текущий фрагмент и вызываем редактирование смены
-                        Fragment currentFragment = getSupportFragmentManager().findFragmentByTag("f" + viewPager.getCurrentItem());
-                        if (currentFragment instanceof ScheduleFragment) {
-                            ((ScheduleFragment) currentFragment).showEditDialog();
-                        } else {
-                            Toast.makeText(MainMenuActivity.this, "Сначала перейдите на вкладку Графики", Toast.LENGTH_SHORT).show();
-                        }
-                    } else if (which == 2) {
+                    } else if (items[which].equals("Выход")) {
                         getSharedPreferences("app", MODE_PRIVATE).edit().clear().apply();
                         startActivity(new Intent(MainMenuActivity.this, LoginActivity.class));
                         finish();

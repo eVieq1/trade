@@ -40,8 +40,6 @@ public class EditDayScheduleDialog extends Dialog {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.edit_day_schedule_dialog);
 
-        setTitle("Смены на " + day + "." + month + "." + year);
-
         recyclerView = findViewById(R.id.recyclerViewShifts);
         recyclerView.setLayoutManager(new LinearLayoutManager(context));
 

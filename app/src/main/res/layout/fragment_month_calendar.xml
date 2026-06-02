@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:paddingTop="8dp"
+    android:background="#F5F5F5">
+
+    <!-- Заголовок месяца -->
+    <TextView
+        android:id="@+id/tvMonthYear"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Июнь 2026"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:textColor="#2196F3"
+        android:gravity="center"
+        android:layout_marginBottom="8dp" />
+
+    <!-- Заголовки дней недели -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="4dp">
+
+        <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="32dp" android:text="ПН" android:gravity="center" android:textStyle="bold" android:textColor="#333333" android:background="#E0E0E0" android:padding="8dp"/>
+        <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="32dp" android:text="ВТ" android:gravity="center" android:textStyle="bold" android:textColor="#333333" android:background="#E0E0E0" android:padding="8dp"/>
+        <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="32dp" android:text="СР" android:gravity="center" android:textStyle="bold" android:textColor="#333333" android:background="#E0E0E0" android:padding="8dp"/>
+        <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="32dp" android:text="ЧТ" android:gravity="center" android:textStyle="bold" android:textColor="#333333" android:background="#E0E0E0" android:padding="8dp"/>
+        <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="32dp" android:text="ПТ" android:gravity="center" android:textStyle="bold" android:textColor="#333333" android:background="#E0E0E0" android:padding="8dp"/>
+        <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="32dp" android:text="СБ" android:gravity="center" android:textStyle="bold" android:textColor="#333333" android:background="#E0E0E0" android:padding="8dp"/>
+        <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="32dp" android:text="ВС" android:gravity="center" android:textStyle="bold" android:textColor="#333333" android:background="#E0E0E0" android:padding="8dp"/>
+
+    </LinearLayout>
+
+    <!-- Календарь -->
+    <GridView
+        android:id="@+id/gridSchedule"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:numColumns="7"
+        android:verticalSpacing="1dp"
+        android:horizontalSpacing="1dp"
+        android:stretchMode="columnWidth"
+        android:layout_marginBottom="12dp" />
+
+    <!-- Выбранная дата -->
+    <TextView
+        android:id="@+id/tvSelectedDate"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Понедельник - 1 июня"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        android:textColor="#333333"
+        android:layout_marginBottom="8dp" />
+
+    <!-- ScrollView для списка сотрудников -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="4dp">
+
+        <LinearLayout
+            android:id="@+id/llEmployeesList"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
+    </ScrollView>
+
+    <TextView
+        android:id="@+id/tvUpdateTime"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:textSize="10sp"
+        android:textColor="#999999"
+        android:layout_marginTop="8dp" />
+
+</LinearLayout>

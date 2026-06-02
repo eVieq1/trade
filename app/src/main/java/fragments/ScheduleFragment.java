@@ -5,14 +5,18 @@ import android.content.SharedPreferences;
 import android.graphics.Typeface;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.*;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
-import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
+import androidx.recyclerview.widget.GridLayoutManager;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 import com.example.salestracker.ApiClient;
 import com.example.salestracker.R;
 import org.json.JSONArray;
@@ -21,11 +25,12 @@ import java.util.*;
 
 public class ScheduleFragment extends Fragment {
 
-    private GridView gridSchedule;
-    private TextView tvMonthYear, tvSelectedDate, tvDirector, tvSpecialist, tvShiftTime, tvUpdateTime, tvPostalCode;
-    private Button btnPrevMonth, btnNextMonth;
-    private SwipeRefreshLayout swipeRefresh;
+    private RecyclerView rvCalendar;
+    private TextView tvSelectedDate, tvUpdateTime, tvPostalCode;
     private LinearLayout llEmployeesList;
+    private RecyclerView monthRecyclerView;
+    private MonthAdapter monthAdapter;
+    private CalendarAdapter calendarAdapter;
 
     private int currentYear, currentMonth;
     private Map<String, List<ShiftData>> shifts = new HashMap<>();
@@ -35,13 +40,80 @@ public class ScheduleFragment extends Fragment {
     private ApiClient apiClient;
     private String currentEmployee;
 
+    private List<MonthData> monthList = new ArrayList<>();
+    private int currentPosition = 120;
+
     private final String[] monthNamesNominative = {"Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
             "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"};
 
     private final String[] monthNamesGenitive = {"января", "февраля", "марта", "апреля", "мая", "июня",
             "июля", "августа", "сентября", "октября", "ноября", "декабря"};
 
-    private class CalendarAdapter extends BaseAdapter {
+    private static class MonthData {
+        int year, month;
+        MonthData(int year, int month) {
+            this.year = year;
+            this.month = month;
+        }
+    }
+
+    private class MonthAdapter extends RecyclerView.Adapter<MonthAdapter.ViewHolder> {
+        @NonNull
+        @Override
+        public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            TextView tv = new TextView(parent.getContext());
+            tv.setLayoutParams(new RecyclerView.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+            ));
+            tv.setGravity(Gravity.CENTER);
+            tv.setTextSize(16);
+            tv.setTypeface(Typeface.DEFAULT_BOLD);
+            tv.setPadding(48, 16, 48, 16);
+            return new ViewHolder(tv);
+        }
+
+        @Override
+        public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
+            MonthData data = monthList.get(position);
+            String text = monthNamesNominative[data.month] + " " + data.year;
+            holder.textView.setText(text);
+
+            if (position == currentPosition) {
+                holder.textView.setTextColor(0xFF2196F3);
+                holder.textView.setTextSize(20);
+            } else {
+                holder.textView.setTextColor(0xFF999999);
+                holder.textView.setTextSize(16);
+            }
+        }
+
+        @Override
+        public int getItemCount() { return monthList.size(); }
+
+        class ViewHolder extends RecyclerView.ViewHolder {
+            TextView textView;
+            ViewHolder(View itemView) {
+                super(itemView);
+                textView = (TextView) itemView;
+                itemView.setOnClickListener(v -> {
+                    int pos = getAdapterPosition();
+                    if (pos != -1 && pos != currentPosition) {
+                        currentPosition = pos;
+                        MonthData data = monthList.get(pos);
+                        currentYear = data.year;
+                        currentMonth = data.month;
+                        selectedDay = 0;
+                        loadFromServer();
+                        notifyDataSetChanged();
+                        monthRecyclerView.smoothScrollToPosition(currentPosition);
+                    }
+                });
+            }
+        }
+    }
+
+    private class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHolder> {
         private List<Integer> days = new ArrayList<>();
 
         public void setDays(List<Integer> days) {
@@ -49,49 +121,50 @@ public class ScheduleFragment extends Fragment {
             notifyDataSetChanged();
         }
 
+        @NonNull
         @Override
-        public int getCount() { return days.size(); }
+        public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            TextView tv = new TextView(parent.getContext());
+            tv.setGravity(Gravity.CENTER);
+            tv.setTextSize(12);
+            tv.setTypeface(Typeface.DEFAULT_BOLD);
+            int cellSizePx = (int) (38 * getResources().getDisplayMetrics().density);
+            tv.setLayoutParams(new ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    cellSizePx
+            ));
+            return new ViewHolder(tv);
+        }
 
         @Override
-        public Object getItem(int position) { return days.get(position); }
-
-        @Override
-        public long getItemId(int position) { return position; }
-
-        @Override
-        public View getView(int position, View convertView, ViewGroup parent) {
-            TextView cell;
-            if (convertView == null) {
-                cell = new TextView(getContext());
-                cell.setGravity(Gravity.CENTER);
-                cell.setTextSize(12);
-                cell.setTypeface(Typeface.DEFAULT_BOLD);
-                int cellSizePx = (int) (38 * getResources().getDisplayMetrics().density);
-                cell.setLayoutParams(new GridView.LayoutParams(GridView.LayoutParams.MATCH_PARENT, cellSizePx));
-            } else {
-                cell = (TextView) convertView;
-            }
-
+        public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
             int dayNumber = days.get(position);
             if (dayNumber == 0) {
-                cell.setText("");
-                cell.setBackgroundColor(0xFFF5F5F5);
+                holder.textView.setText("");
+                holder.textView.setBackgroundColor(0xFFF5F5F5);
             } else {
-                cell.setText(String.valueOf(dayNumber));
-                cell.setBackgroundColor(0xFFFFFFFF);
-                cell.setTextColor(selectedDay == dayNumber ? 0xFFFFFFFF : 0xFF000000);
-                cell.setBackgroundColor(selectedDay == dayNumber ? 0xFF2196F3 : 0xFFFFFFFF);
-                cell.setOnClickListener(v -> {
+                holder.textView.setText(String.valueOf(dayNumber));
+                holder.textView.setTextColor(selectedDay == dayNumber ? 0xFFFFFFFF : 0xFF000000);
+                holder.textView.setBackgroundColor(selectedDay == dayNumber ? 0xFF2196F3 : 0xFFFFFFFF);
+                holder.textView.setOnClickListener(v -> {
                     selectedDay = dayNumber;
                     showDayInfo(selectedDay);
                     notifyDataSetChanged();
                 });
             }
-            return cell;
+        }
+
+        @Override
+        public int getItemCount() { return days.size(); }
+
+        class ViewHolder extends RecyclerView.ViewHolder {
+            TextView textView;
+            ViewHolder(View itemView) {
+                super(itemView);
+                textView = (TextView) itemView;
+            }
         }
     }
-
-    private CalendarAdapter calendarAdapter;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -100,54 +173,65 @@ public class ScheduleFragment extends Fragment {
         apiClient = new ApiClient();
         calendarAdapter = new CalendarAdapter();
 
-        swipeRefresh = view.findViewById(R.id.swipeRefresh);
-        gridSchedule = view.findViewById(R.id.gridSchedule);
-        tvMonthYear = view.findViewById(R.id.tvMonthYear);
+        rvCalendar = view.findViewById(R.id.rvCalendar);
         tvSelectedDate = view.findViewById(R.id.tvSelectedDate);
-        tvDirector = view.findViewById(R.id.tvDirector);
-        tvSpecialist = view.findViewById(R.id.tvSpecialist);
-        tvShiftTime = view.findViewById(R.id.tvShiftTime);
         tvUpdateTime = view.findViewById(R.id.tvUpdateTime);
         tvPostalCode = view.findViewById(R.id.tvPostalCode);
-        btnPrevMonth = view.findViewById(R.id.btnPrevMonth);
-        btnNextMonth = view.findViewById(R.id.btnNextMonth);
         llEmployeesList = view.findViewById(R.id.llEmployeesList);
+        monthRecyclerView = view.findViewById(R.id.monthRecyclerView);
 
-        gridSchedule.setAdapter(calendarAdapter);
-        gridSchedule.setNumColumns(7);
-        gridSchedule.setVerticalSpacing(1);
-        gridSchedule.setHorizontalSpacing(1);
+        GridLayoutManager gridLayoutManager = new GridLayoutManager(getContext(), 7);
+        rvCalendar.setLayoutManager(gridLayoutManager);
+        rvCalendar.setAdapter(calendarAdapter);
 
         SharedPreferences prefs = requireActivity().getSharedPreferences("app", Context.MODE_PRIVATE);
         currentEmployee = prefs.getString("employee_name", "");
         isAdmin = prefs.getString("user_role", "seller").equals("dm");
 
-        swipeRefresh.setOnRefreshListener(() -> {
-            loadEmployees();
-            loadFromServer();
-            swipeRefresh.setRefreshing(false);
-        });
-
         Calendar cal = Calendar.getInstance();
         currentYear = cal.get(Calendar.YEAR);
         currentMonth = cal.get(Calendar.MONTH);
 
+        for (int i = -120; i <= 120; i++) {
+            int y = currentYear + (i / 12);
+            int m = currentMonth + i;
+            while (m < 0) { m += 12; y--; }
+            while (m > 11) { m -= 12; y++; }
+            monthList.add(new MonthData(y, m));
+        }
+        currentPosition = 120;
+
+        LinearLayoutManager layoutManager = new LinearLayoutManager(getContext(), LinearLayoutManager.HORIZONTAL, false);
+        monthRecyclerView.setLayoutManager(layoutManager);
+        monthAdapter = new MonthAdapter();
+        monthRecyclerView.setAdapter(monthAdapter);
+
+        monthRecyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrollStateChanged(@NonNull RecyclerView recyclerView, int newState) {
+                if (newState == RecyclerView.SCROLL_STATE_IDLE) {
+                    LinearLayoutManager lm = (LinearLayoutManager) recyclerView.getLayoutManager();
+                    int centerPosition = lm.findFirstCompletelyVisibleItemPosition();
+                    if (centerPosition == -1) {
+                        centerPosition = lm.findFirstVisibleItemPosition();
+                    }
+                    if (centerPosition != -1 && centerPosition != currentPosition) {
+                        currentPosition = centerPosition;
+                        MonthData data = monthList.get(currentPosition);
+                        currentYear = data.year;
+                        currentMonth = data.month;
+                        selectedDay = 0;
+                        loadFromServer();
+                        monthAdapter.notifyDataSetChanged();
+                    }
+                }
+            }
+        });
+
+        monthRecyclerView.scrollToPosition(currentPosition);
+
         loadEmployees();
         loadFromServer();
-
-        btnPrevMonth.setOnClickListener(v -> {
-            currentMonth--;
-            if (currentMonth < 0) { currentMonth = 11; currentYear--; }
-            selectedDay = 0;
-            loadFromServer();
-        });
-
-        btnNextMonth.setOnClickListener(v -> {
-            currentMonth++;
-            if (currentMonth > 11) { currentMonth = 0; currentYear++; }
-            selectedDay = 0;
-            loadFromServer();
-        });
 
         return view;
     }
@@ -164,19 +248,15 @@ public class ScheduleFragment extends Fragment {
                         JSONObject emp = arr.getJSONObject(i);
                         employees.add(new Employee(emp.getInt("id"), emp.getString("name"), emp.getString("role")));
                     }
-                } catch (Exception e) { setDefaultEmployees(); }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             }
             @Override
-            public void onError(String error) { setDefaultEmployees(); }
+            public void onError(String error) {
+                Log.e("ScheduleFragment", "Ошибка загрузки сотрудников: " + error);
+            }
         });
-    }
-
-    private void setDefaultEmployees() {
-        employees.clear();
-        employees.add(new Employee(1, "Владислав", "dm"));
-        employees.add(new Employee(2, "Николай", "seller"));
-        employees.add(new Employee(3, "Алена", "seller"));
-        employees.add(new Employee(4, "Диана", "seller"));
     }
 
     private void loadFromServer() {
@@ -208,15 +288,18 @@ public class ScheduleFragment extends Fragment {
     private void saveToServer(int day, String employee, String shiftTime) {
         apiClient.saveSchedule(currentYear, currentMonth + 1, day, employee, shiftTime, new ApiClient.ApiCallback() {
             @Override
-            public void onSuccess(String response) { if (getContext() != null) Toast.makeText(getContext(), "Сохранено", Toast.LENGTH_SHORT).show(); }
+            public void onSuccess(String response) {
+                Log.d("ScheduleFragment", "Сохранено: " + response);
+            }
             @Override
-            public void onError(String error) { if (getContext() != null) Toast.makeText(getContext(), "Ошибка: " + error, Toast.LENGTH_SHORT).show(); }
+            public void onError(String error) {
+                Log.e("ScheduleFragment", "Ошибка: " + error);
+            }
         });
     }
 
     private void updateCalendar() {
         if (getContext() == null) return;
-        tvMonthYear.setText(monthNamesNominative[currentMonth] + " " + currentYear);
 
         Calendar cal = Calendar.getInstance();
         cal.set(currentYear, currentMonth, 1);
@@ -230,8 +313,180 @@ public class ScheduleFragment extends Fragment {
         while (daysList.size() < 42) daysList.add(0);
 
         calendarAdapter.setDays(daysList);
-        if (selectedDay == 0 && daysInMonth > 0) selectedDay = 1;
+
+        if (selectedDay == 0 || selectedDay > daysInMonth) {
+            selectedDay = 1;
+        }
+
         showDayInfo(selectedDay);
+
+        if (monthAdapter != null) {
+            monthAdapter.notifyDataSetChanged();
+        }
+    }
+
+    private void showAddEmployeeDialog(int day) {
+        if (!isAdmin) {
+            Toast.makeText(getContext(), "Доступ только для директора", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String[] employeeNames = new String[employees.size()];
+        for (int i = 0; i < employees.size(); i++) {
+            employeeNames[i] = employees.get(i).name;
+        }
+        String[] times = {"09:00-18:00", "10:00-19:00", "12:00-21:00", "Выходной", "Отпуск", "Больничный", "Другой офис"};
+
+        LinearLayout layout = new LinearLayout(getContext());
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(48, 24, 48, 16);
+
+        TextView tvDay = new TextView(getContext());
+        tvDay.setText("Дата: " + day + " " + monthNamesGenitive[currentMonth]);
+        tvDay.setTextSize(16);
+        tvDay.setTypeface(Typeface.DEFAULT_BOLD);
+        tvDay.setPadding(0, 0, 0, 16);
+        layout.addView(tvDay);
+
+        TextView tvEmployeeLabel = new TextView(getContext());
+        tvEmployeeLabel.setText("Выберите сотрудника:");
+        tvEmployeeLabel.setTextSize(14);
+        tvEmployeeLabel.setPadding(0, 8, 0, 8);
+        layout.addView(tvEmployeeLabel);
+
+        Spinner spinnerEmployee = new Spinner(getContext());
+        ArrayAdapter<String> employeeAdapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_dropdown_item, employeeNames);
+        spinnerEmployee.setAdapter(employeeAdapter);
+        layout.addView(spinnerEmployee);
+
+        TextView tvTimeLabel = new TextView(getContext());
+        tvTimeLabel.setText("Выберите время/статус:");
+        tvTimeLabel.setTextSize(14);
+        tvTimeLabel.setPadding(0, 8, 0, 8);
+        layout.addView(tvTimeLabel);
+
+        Spinner spinnerTime = new Spinner(getContext());
+        ArrayAdapter<String> timeAdapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_dropdown_item, times);
+        spinnerTime.setAdapter(timeAdapter);
+        layout.addView(spinnerTime);
+
+        new AlertDialog.Builder(getContext())
+                .setTitle("Добавить сотрудника")
+                .setView(layout)
+                .setPositiveButton("Добавить", (dialog, which) -> {
+                    String employee = spinnerEmployee.getSelectedItem().toString();
+                    String time = spinnerTime.getSelectedItem().toString();
+
+                    String key = currentYear + "-" + (currentMonth + 1) + "-" + day;
+                    List<ShiftData> currentShifts = shifts.get(key);
+                    if (currentShifts == null) {
+                        currentShifts = new ArrayList<>();
+                    }
+
+                    boolean exists = false;
+                    for (ShiftData s : currentShifts) {
+                        if (s.employee.equals(employee)) {
+                            exists = true;
+                            break;
+                        }
+                    }
+
+                    if (!exists) {
+                        currentShifts.add(new ShiftData(employee, time));
+                        shifts.put(key, currentShifts);
+                        saveToServer(day, employee, time);
+                        showDayInfo(selectedDay);
+                        Toast.makeText(getContext(), "Сотрудник добавлен", Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(getContext(), "Сотрудник уже есть в этот день", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
+    }
+
+    private void showEditEmployeeDialog(String employee, String currentShiftTime, int day) {
+        if (!isAdmin) {
+            Toast.makeText(getContext(), "Доступ только для директора", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String[] times = {"09:00-18:00", "10:00-19:00", "12:00-21:00", "Выходной", "Отпуск", "Больничный", "Другой офис"};
+
+        LinearLayout layout = new LinearLayout(getContext());
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(48, 24, 48, 16);
+
+        TextView tvEmployee = new TextView(getContext());
+        tvEmployee.setText("Сотрудник: " + employee);
+        tvEmployee.setTextSize(16);
+        tvEmployee.setTypeface(Typeface.DEFAULT_BOLD);
+        tvEmployee.setPadding(0, 0, 0, 16);
+        layout.addView(tvEmployee);
+
+        TextView tvTimeLabel = new TextView(getContext());
+        tvTimeLabel.setText("Выберите время/статус:");
+        tvTimeLabel.setTextSize(14);
+        tvTimeLabel.setPadding(0, 8, 0, 8);
+        layout.addView(tvTimeLabel);
+
+        Spinner spinnerTime = new Spinner(getContext());
+        ArrayAdapter<String> timeAdapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_dropdown_item, times);
+        spinnerTime.setAdapter(timeAdapter);
+
+        for (int i = 0; i < times.length; i++) {
+            if (times[i].equals(currentShiftTime)) {
+                spinnerTime.setSelection(i);
+                break;
+            }
+        }
+        layout.addView(spinnerTime);
+
+        new AlertDialog.Builder(getContext())
+                .setTitle("Редактировать смену")
+                .setView(layout)
+                .setPositiveButton("Сохранить", (dialog, which) -> {
+                    String newTime = spinnerTime.getSelectedItem().toString();
+                    saveToServer(day, employee, newTime);
+                    String key = currentYear + "-" + (currentMonth + 1) + "-" + day;
+                    List<ShiftData> currentShifts = shifts.get(key);
+                    if (currentShifts == null) {
+                        currentShifts = new ArrayList<>();
+                    }
+                    boolean found = false;
+                    for (ShiftData s : currentShifts) {
+                        if (s.employee.equals(employee)) {
+                            s.shiftTime = newTime;
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        currentShifts.add(new ShiftData(employee, newTime));
+                    }
+                    shifts.put(key, currentShifts);
+                    showDayInfo(selectedDay);
+                    Toast.makeText(getContext(), "Смена сохранена", Toast.LENGTH_SHORT).show();
+                })
+                .setNeutralButton("Удалить", (dialog, which) -> {
+                    // Удаляем локально
+                    String key = currentYear + "-" + (currentMonth + 1) + "-" + day;
+                    List<ShiftData> currentShifts = shifts.get(key);
+                    if (currentShifts != null) {
+                        currentShifts.removeIf(s -> s.employee.equals(employee));
+                        if (currentShifts.isEmpty()) {
+                            shifts.remove(key);
+                        } else {
+                            shifts.put(key, currentShifts);
+                        }
+                    }
+                    showDayInfo(selectedDay);
+                    Toast.makeText(getContext(), "Сотрудник удален", Toast.LENGTH_SHORT).show();
+                    // Отправляем запрос на сервер
+                    saveToServer(day, employee, "");
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
     }
 
     private void showDayInfo(int day) {
@@ -247,72 +502,81 @@ public class ScheduleFragment extends Fragment {
         String key = currentYear + "-" + (currentMonth + 1) + "-" + day;
         List<ShiftData> dayShifts = shifts.get(key);
 
-        tvDirector.setText(currentEmployee);
-
         llEmployeesList.removeAllViews();
 
-        String specialist = "";
-        String shiftTime = "";
+        if (isAdmin) {
+            Button btnAddEmployee = new Button(getContext());
+            btnAddEmployee.setText("+ Добавить сотрудника");
+            btnAddEmployee.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF2196F3));
+            btnAddEmployee.setTextColor(Color.WHITE);
+            btnAddEmployee.setPadding(16, 12, 16, 12);
+            btnAddEmployee.setOnClickListener(v -> showAddEmployeeDialog(day));
+            LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT);
+            btnParams.setMargins(0, 0, 0, 12);
+            btnAddEmployee.setLayoutParams(btnParams);
+            llEmployeesList.addView(btnAddEmployee);
+        }
 
         if (dayShifts != null && !dayShifts.isEmpty()) {
             for (ShiftData data : dayShifts) {
-                // Плашка каждого сотрудника
+                if (data.shiftTime == null || data.shiftTime.isEmpty()) {
+                    continue;
+                }
+
                 LinearLayout card = new LinearLayout(getContext());
                 card.setOrientation(LinearLayout.HORIZONTAL);
                 card.setPadding(16, 12, 16, 12);
                 card.setBackgroundColor(Color.WHITE);
                 card.setElevation(2f);
+                card.setClickable(true);
 
                 LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT);
-                cardParams.setMargins(0, 0, 0, 6);
+                cardParams.setMargins(8, 4, 8, 4);
                 card.setLayoutParams(cardParams);
 
-                TextView tvName = new TextView(getContext());
-                tvName.setText(data.employee);
-                tvName.setTextSize(14);
-                tvName.setTypeface(Typeface.DEFAULT_BOLD);
-                tvName.setTextColor(0xFF333333);
-                tvName.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+                String role = "Специалист";
+                for (Employee emp : employees) {
+                    if (emp.name.equals(data.employee)) {
+                        if (emp.role.equals("dm")) {
+                            role = "Директор";
+                        }
+                        break;
+                    }
+                }
 
-                TextView tvStatus = new TextView(getContext());
-                tvStatus.setText(getDisplayText(data.shiftTime));
-                tvStatus.setTextSize(12);
-                tvStatus.setTextColor(getStatusColor(data.shiftTime));
-                tvStatus.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-                tvStatus.setGravity(Gravity.END);
+                TextView tvLeft = new TextView(getContext());
+                tvLeft.setText(role + ": " + data.employee);
+                tvLeft.setTextSize(14);
+                tvLeft.setTypeface(Typeface.DEFAULT_BOLD);
+                tvLeft.setTextColor(0xFF333333);
+                tvLeft.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
 
-                card.addView(tvName);
-                card.addView(tvStatus);
+                TextView tvRight = new TextView(getContext());
+                tvRight.setText(getDisplayText(data.shiftTime));
+                tvRight.setTextSize(14);
+                tvRight.setTypeface(Typeface.DEFAULT_BOLD);
+                tvRight.setTextColor(getStatusColor(data.shiftTime));
+                tvRight.setLayoutParams(new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT));
+                tvRight.setGravity(Gravity.END);
+
+                card.addView(tvLeft);
+                card.addView(tvRight);
+
+                final String employeeName = data.employee;
+                final String currentShift = data.shiftTime;
+                card.setOnClickListener(v -> showEditEmployeeDialog(employeeName, currentShift, day));
 
                 llEmployeesList.addView(card);
-
-                if (!data.employee.equals(currentEmployee) && specialist.isEmpty()) {
-                    specialist = data.employee;
-                    shiftTime = data.shiftTime;
-                }
             }
-        } else {
-            TextView tvEmpty = new TextView(getContext());
-            tvEmpty.setText("На этот день никто не назначен");
-            tvEmpty.setPadding(16, 16, 16, 16);
-            tvEmpty.setTextSize(12);
-            tvEmpty.setTextColor(0xFF999999);
-            tvEmpty.setGravity(Gravity.CENTER);
-            llEmployeesList.addView(tvEmpty);
         }
 
-        if (!specialist.isEmpty()) {
-            tvSpecialist.setText(specialist);
-            tvShiftTime.setText(getDisplayText(shiftTime));
-            tvShiftTime.setVisibility(View.VISIBLE);
-        } else {
-            tvSpecialist.setText("Не назначен");
-            tvShiftTime.setVisibility(View.GONE);
-        }
-
-        tvUpdateTime.setText("Последнее обновление данных: " + new java.text.SimpleDateFormat("dd.MM.yyyy 'в' HH:mm", Locale.getDefault()).format(new java.util.Date()));
+        tvUpdateTime.setText("Обновлено: " + new java.text.SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(new java.util.Date()));
     }
 
     private int getStatusColor(String shiftTime) {
@@ -346,56 +610,19 @@ public class ScheduleFragment extends Fragment {
     public void showEditDialog() {
         if (getContext() == null || employees.isEmpty()) return;
 
-        // Только для директора
         if (!isAdmin) {
             Toast.makeText(getContext(), "Доступ только для директора", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        String[] employeeNames = new String[employees.size()];
-        for (int i = 0; i < employees.size(); i++) {
-            employeeNames[i] = employees.get(i).name;
+        showAddEmployeeDialog(selectedDay);
+    }
+
+    public void refreshData() {
+        if (getContext() != null) {
+            loadFromServer();
+            Toast.makeText(getContext(), "Данные обновлены", Toast.LENGTH_SHORT).show();
         }
-        String[] times = {"09:00-18:00", "10:00-19:00", "12:00-21:00", "Выходной", "Отпуск", "Больничный", "Другой офис"};
-
-        View dialogView = getLayoutInflater().inflate(R.layout.dialog_shift, null);
-        Spinner spinnerEmployee = dialogView.findViewById(R.id.spinnerEmployee);
-        Spinner spinnerTime = dialogView.findViewById(R.id.spinnerTime);
-        spinnerEmployee.setAdapter(new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_dropdown_item, employeeNames));
-        spinnerTime.setAdapter(new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_dropdown_item, times));
-
-        String key = currentYear + "-" + (currentMonth + 1) + "-" + selectedDay;
-        List<ShiftData> currentShifts = shifts.get(key);
-        if (currentShifts != null && !currentShifts.isEmpty()) {
-            ShiftData currentData = currentShifts.get(0);
-            for (int i = 0; i < employeeNames.length; i++) {
-                if (employeeNames[i].equals(currentData.employee)) {
-                    spinnerEmployee.setSelection(i);
-                    break;
-                }
-            }
-            for (int i = 0; i < times.length; i++) {
-                if (times[i].equals(currentData.shiftTime)) {
-                    spinnerTime.setSelection(i);
-                    break;
-                }
-            }
-        }
-
-        new AlertDialog.Builder(getContext())
-                .setTitle("Смена на " + selectedDay + " " + tvMonthYear.getText())
-                .setView(dialogView)
-                .setPositiveButton("Сохранить", (dialog, which) -> {
-                    String employee = spinnerEmployee.getSelectedItem().toString();
-                    String time = spinnerTime.getSelectedItem().toString();
-                    List<ShiftData> newShifts = new ArrayList<>();
-                    newShifts.add(new ShiftData(employee, time));
-                    shifts.put(key, newShifts);
-                    saveToServer(selectedDay, employee, time);
-                    updateCalendar();
-                })
-                .setNegativeButton("Отмена", null)
-                .show();
     }
 
     static class ShiftData {
