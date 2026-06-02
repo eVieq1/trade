@@ -38,7 +38,7 @@ public class EditDayScheduleDialog extends Dialog {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.dialog_edit_day_schedule);
+        setContentView(R.layout.edit_day_schedule_dialog); // ИСПРАВЛЕНО
 
         setTitle("Смены на " + day + "." + month + "." + year);
 
@@ -85,7 +85,6 @@ public class EditDayScheduleDialog extends Dialog {
                     JSONObject schedule = obj.getJSONObject("schedule");
                     shifts.clear();
 
-                    // ИСПРАВЛЕНО: int day преобразуем в String
                     String key = String.valueOf(day);
                     if (schedule.has(key)) {
                         JSONArray dayArray = schedule.getJSONArray(key);
