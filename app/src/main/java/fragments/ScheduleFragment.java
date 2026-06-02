@@ -36,7 +36,6 @@ public class ScheduleFragment extends Fragment {
     private ApiClient apiClient;
     private String currentEmployee;
 
-    // Получить отображаемый текст статуса
     private String getDisplayText(String shiftTime) {
         if (shiftTime == null) return "?";
         switch (shiftTime) {
@@ -51,7 +50,6 @@ public class ScheduleFragment extends Fragment {
         }
     }
 
-    // Получить краткий текст для ячейки календаря
     private String getShortStatus(String shiftTime) {
         if (shiftTime == null) return "?";
         switch (shiftTime) {
@@ -61,27 +59,25 @@ public class ScheduleFragment extends Fragment {
             case "Выходной": return "Вых";
             case "Отпуск": return "Отп";
             case "Больничный": return "Бол";
-            case "Другой офис": return "Др.офис";
+            case "Другой офис": return "Др";
             default: return "?";
         }
     }
 
-    // Получить цвет для ячейки календаря (по статусу)
     private int getStatusColor(String shiftTime) {
         if (shiftTime == null) return 0xFFFFFFFF;
         switch (shiftTime) {
-            case "09:00-18:00": return 0xFFA5D6A7;  // Зелёный
-            case "10:00-19:00": return 0xFFA5D6A7;  // Зелёный
-            case "12:00-21:00": return 0xFFA5D6A7;  // Зелёный
-            case "Выходной": return 0xFF90CAF9;     // Синий
-            case "Отпуск": return 0xFFFFFFFF;       // Белый (без цвета)
-            case "Больничный": return 0xFFFFFFFF;   // Белый (без цвета)
-            case "Другой офис": return 0xFFFFF59D;  // Жёлтый
+            case "09:00-18:00": return 0xFFA5D6A7;
+            case "10:00-19:00": return 0xFFA5D6A7;
+            case "12:00-21:00": return 0xFFA5D6A7;
+            case "Выходной": return 0xFF90CAF9;
+            case "Отпуск": return 0xFFFFFFFF;
+            case "Больничный": return 0xFFFFFFFF;
+            case "Другой офис": return 0xFFFFF59D;
             default: return 0xFFFFFFFF;
         }
     }
 
-    // Получить цвет текста статуса в нижней плашке
     private int getShiftTextColor(String shiftTime) {
         if (shiftTime == null) return 0xFF333333;
         switch (shiftTime) {
@@ -205,15 +201,17 @@ public class ScheduleFragment extends Fragment {
                     shifts.clear();
                     for (Iterator<String> it = schedule.keys(); it.hasNext(); ) {
                         String day = it.next();
-                        JSONObject data = schedule.getJSONObject(day);
-                        String employee = data.getString("employee");
-                        String shiftTime = data.getString("shift_time");
-
-                        String key = currentYear + "-" + (currentMonth + 1) + "-" + day;
-                        if (!shifts.containsKey(key)) {
-                            shifts.put(key, new ArrayList<>());
+                        // Новая структура: массив сотрудников
+                        JSONArray dayArray = schedule.getJSONArray(day);
+                        List<ShiftData> dayShifts = new ArrayList<>();
+                        for (int i = 0; i < dayArray.length(); i++) {
+                            JSONObject data = dayArray.getJSONObject(i);
+                            dayShifts.add(new ShiftData(
+                                    data.getString("employee"),
+                                    data.getString("shift_time")
+                            ));
                         }
-                        shifts.get(key).add(new ShiftData(employee, shiftTime));
+                        shifts.put(currentYear + "-" + (currentMonth + 1) + "-" + day, dayShifts);
                     }
                     updateCalendar();
                 } catch (Exception e) {
@@ -266,13 +264,12 @@ public class ScheduleFragment extends Fragment {
 
         tableSchedule.removeAllViews();
 
-        // Заголовки дней недели
         TableRow headerRow = new TableRow(getContext());
         String[] weekDays = {"ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ", "ВС"};
         for (String dayName : weekDays) {
             TextView header = new TextView(getContext());
             header.setText(dayName);
-            header.setPadding(8, 10, 8, 10);
+            header.setPadding(12, 12, 12, 12);
             header.setGravity(Gravity.CENTER);
             header.setTypeface(Typeface.DEFAULT_BOLD);
             header.setBackgroundColor(0xFFE0E0E0);
@@ -288,9 +285,8 @@ public class ScheduleFragment extends Fragment {
             TableRow row = new TableRow(getContext());
             for (int col = 0; col < 7; col++) {
                 TextView cell = new TextView(getContext());
-                cell.setPadding(4, 8, 4, 8);
+                cell.setPadding(8, 12, 8, 12);
                 cell.setGravity(Gravity.CENTER);
-                cell.setTextSize(11);
                 cell.setLayoutParams(new TableRow.LayoutParams(0, TableRow.LayoutParams.WRAP_CONTENT, 1f));
 
                 if (rowCount == 0 && col < firstDayOfWeek) {
