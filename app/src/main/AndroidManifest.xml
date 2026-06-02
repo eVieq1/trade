@@ -7,8 +7,8 @@
     <application
         android:allowBackup="true"
         android:icon="@android:drawable/sym_def_app_icon"
-        android:label=""
-        android:theme="@style/Theme.AppCompat.Light"
+        android:label="SalesTracker"
+        android:theme="@style/Theme.AppCompat.Light.NoActionBar"
         android:usesCleartextTraffic="true">
 
         <activity android:name=".LoginActivity"

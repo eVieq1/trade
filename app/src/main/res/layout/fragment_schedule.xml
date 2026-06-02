@@ -12,7 +12,6 @@
         android:padding="16dp"
         android:paddingTop="8dp">
 
-        <!-- Заголовок -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -22,7 +21,7 @@
             android:textColor="#333333"
             android:layout_marginBottom="4dp" />
 
-        <!-- Месяц и карандаш -->
+        <!-- Месяц + карандаш -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -50,7 +49,6 @@
 
         </LinearLayout>
 
-        <!-- Кнопки навигации -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -77,7 +75,6 @@
 
         </LinearLayout>
 
-        <!-- Заголовки дней недели -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -163,7 +160,6 @@
 
         </LinearLayout>
 
-        <!-- Календарь -->
         <GridView
             android:id="@+id/gridSchedule"
             android:layout_width="match_parent"
@@ -174,7 +170,6 @@
             android:stretchMode="columnWidth"
             android:layout_marginBottom="16dp" />
 
-        <!-- Адрес -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -192,7 +187,6 @@
             android:textColor="#666666"
             android:layout_marginBottom="16dp" />
 
-        <!-- Информация о выбранном дне -->
         <TextView
             android:id="@+id/tvSelectedDate"
             android:layout_width="wrap_content"
@@ -252,18 +246,6 @@
             android:text=""
             android:textSize="10sp"
             android:textColor="#999999" />
-
-        <!-- Кнопка редактирования (запасная, если нужна) -->
-        <Button
-            android:id="@+id/btnEditShiftButton"
-            android:layout_width="match_parent"
-            android:layout_height="40dp"
-            android:text="✏️ РЕДАКТИРОВАТЬ СМЕНУ"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:backgroundTint="#2196F3"
-            android:visibility="gone"
-            android:layout_marginTop="8dp" />
 
     </LinearLayout>
 </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
