@@ -3,10 +3,10 @@ package com.example.salestracker;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
-import com.example.salestracker.R;
 import java.util.Calendar;
 
 public class PlanSettingsActivity extends AppCompatActivity {
