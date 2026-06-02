@@ -3,7 +3,6 @@ package com.example.salestracker;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
-import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AlertDialog;
@@ -23,8 +22,7 @@ public class MainMenuActivity extends AppCompatActivity {
 
     private ViewPager2 viewPager;
     private BottomNavigationView bottomNavigation;
-    private TextView tvTitle;
-    private String[] titles = {"Продажи", "Графики", "Отчёты", "Рейтинг"};
+    private TextView btnMenu;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -35,19 +33,12 @@ public class MainMenuActivity extends AppCompatActivity {
         setSupportActionBar(toolbar);
         getSupportActionBar().setDisplayShowTitleEnabled(false);
 
-        tvTitle = findViewById(R.id.tvTitle);
-
-        // СКРЫВАЕМ ЗАГОЛОВОК "SalesTracker"
-        if (tvTitle != null) {
-            tvTitle.setVisibility(View.GONE);
-        }
-
         viewPager = findViewById(R.id.viewPager);
         bottomNavigation = findViewById(R.id.bottomNavigation);
+        btnMenu = findViewById(R.id.btnMenu);
 
         viewPager.setUserInputEnabled(false);
 
-        TextView btnMenu = findViewById(R.id.btnMenu);
         btnMenu.setOnClickListener(v -> showMenuDialog());
 
         List<Fragment> fragments = new ArrayList<>();
@@ -63,16 +54,12 @@ public class MainMenuActivity extends AppCompatActivity {
             int id = item.getItemId();
             if (id == R.id.nav_sales) {
                 viewPager.setCurrentItem(0);
-                tvTitle.setText(titles[0]);
             } else if (id == R.id.nav_schedule) {
                 viewPager.setCurrentItem(1);
-                tvTitle.setText(titles[1]);
             } else if (id == R.id.nav_reports) {
                 viewPager.setCurrentItem(2);
-                tvTitle.setText(titles[2]);
             } else if (id == R.id.nav_rating) {
                 viewPager.setCurrentItem(3);
-                tvTitle.setText(titles[3]);
             }
             return true;
         });
@@ -86,11 +73,8 @@ public class MainMenuActivity extends AppCompatActivity {
                     case 2: bottomNavigation.setSelectedItemId(R.id.nav_reports); break;
                     case 3: bottomNavigation.setSelectedItemId(R.id.nav_rating); break;
                 }
-                tvTitle.setText(titles[position]);
             }
         });
-
-        tvTitle.setText(titles[0]);
     }
 
     private void showMenuDialog() {
