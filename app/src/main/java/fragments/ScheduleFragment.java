@@ -2,7 +2,10 @@ package com.example.salestracker.fragments;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.graphics.Typeface;
+import android.graphics.Color;
 import android.os.Bundle;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -12,26 +15,83 @@ import androidx.fragment.app.Fragment;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 import com.example.salestracker.ApiClient;
 import com.example.salestracker.R;
+import org.json.JSONArray;
 import org.json.JSONObject;
-import java.util.Calendar;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
+import java.util.*;
 
 public class ScheduleFragment extends Fragment {
 
     private TableLayout tableSchedule;
-    private TextView tvMonthYear, tvSelectedDate, tvEmployeeInfo, tvShiftTime, tvUpdateTime;
+    private TextView tvMonthYear, tvSelectedDate, tvUpdateTime;
+    private LinearLayout llEmployeesList;
     private Button btnPrevMonth, btnNextMonth;
     private ImageView btnEditShift;
     private SwipeRefreshLayout swipeRefresh;
 
     private int currentYear, currentMonth;
-    private Map<String, ShiftData> shifts = new HashMap<>();
+    private Map<String, List<ShiftData>> shifts = new HashMap<>();
+    private List<Employee> employees = new ArrayList<>();
     private boolean isAdmin = false;
     private int selectedDay = 0;
     private ApiClient apiClient;
     private String currentEmployee;
+
+    // Получить отображаемый текст статуса
+    private String getDisplayText(String shiftTime) {
+        if (shiftTime == null) return "?";
+        switch (shiftTime) {
+            case "09:00-18:00": return "09:00-18:00";
+            case "10:00-19:00": return "10:00-19:00";
+            case "12:00-21:00": return "12:00-21:00";
+            case "Выходной": return "Выходной";
+            case "Отпуск": return "Отпуск";
+            case "Больничный": return "Больничный";
+            case "Другой офис": return "Другой офис";
+            default: return shiftTime;
+        }
+    }
+
+    // Получить краткий текст для ячейки календаря
+    private String getShortStatus(String shiftTime) {
+        if (shiftTime == null) return "?";
+        switch (shiftTime) {
+            case "09:00-18:00": return "9-18";
+            case "10:00-19:00": return "10-19";
+            case "12:00-21:00": return "12-21";
+            case "Выходной": return "Вых";
+            case "Отпуск": return "Отп";
+            case "Больничный": return "Бол";
+            case "Другой офис": return "Др.офис";
+            default: return "?";
+        }
+    }
+
+    // Получить цвет для ячейки календаря (по статусу)
+    private int getStatusColor(String shiftTime) {
+        if (shiftTime == null) return 0xFFFFFFFF;
+        switch (shiftTime) {
+            case "09:00-18:00": return 0xFFA5D6A7;  // Зелёный
+            case "10:00-19:00": return 0xFFA5D6A7;  // Зелёный
+            case "12:00-21:00": return 0xFFA5D6A7;  // Зелёный
+            case "Выходной": return 0xFF90CAF9;     // Синий
+            case "Отпуск": return 0xFFFFFFFF;       // Белый (без цвета)
+            case "Больничный": return 0xFFFFFFFF;   // Белый (без цвета)
+            case "Другой офис": return 0xFFFFF59D;  // Жёлтый
+            default: return 0xFFFFFFFF;
+        }
+    }
+
+    // Получить цвет текста статуса в нижней плашке
+    private int getShiftTextColor(String shiftTime) {
+        if (shiftTime == null) return 0xFF333333;
+        switch (shiftTime) {
+            case "Выходной": return 0xFF1976D2;
+            case "Отпуск": return 0xFFF57C00;
+            case "Больничный": return 0xFF757575;
+            case "Другой офис": return 0xFFF9A825;
+            default: return 0xFF4CAF50;
+        }
+    }
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -43,9 +103,8 @@ public class ScheduleFragment extends Fragment {
         tableSchedule = view.findViewById(R.id.tableSchedule);
         tvMonthYear = view.findViewById(R.id.tvMonthYear);
         tvSelectedDate = view.findViewById(R.id.tvSelectedDate);
-        tvEmployeeInfo = view.findViewById(R.id.tvEmployeeInfo);
-        tvShiftTime = view.findViewById(R.id.tvShiftTime);
         tvUpdateTime = view.findViewById(R.id.tvUpdateTime);
+        llEmployeesList = view.findViewById(R.id.llEmployeesList);
         btnPrevMonth = view.findViewById(R.id.btnPrevMonth);
         btnNextMonth = view.findViewById(R.id.btnNextMonth);
         btnEditShift = view.findViewById(R.id.btnEditShift);
@@ -63,6 +122,7 @@ public class ScheduleFragment extends Fragment {
         }
 
         swipeRefresh.setOnRefreshListener(() -> {
+            loadEmployees();
             loadFromServer();
             swipeRefresh.setRefreshing(false);
         });
@@ -71,6 +131,7 @@ public class ScheduleFragment extends Fragment {
         currentYear = cal.get(Calendar.YEAR);
         currentMonth = cal.get(Calendar.MONTH);
 
+        loadEmployees();
         loadFromServer();
 
         btnPrevMonth.setOnClickListener(v -> {
@@ -79,6 +140,7 @@ public class ScheduleFragment extends Fragment {
                 currentMonth = 11;
                 currentYear--;
             }
+            selectedDay = 0;
             loadFromServer();
         });
 
@@ -88,10 +150,48 @@ public class ScheduleFragment extends Fragment {
                 currentMonth = 0;
                 currentYear++;
             }
+            selectedDay = 0;
             loadFromServer();
         });
 
         return view;
+    }
+
+    private void loadEmployees() {
+        apiClient.getEmployees(new ApiClient.ApiCallback() {
+            @Override
+            public void onSuccess(String response) {
+                try {
+                    JSONObject obj = new JSONObject(response);
+                    JSONArray arr = obj.getJSONArray("employees");
+                    employees.clear();
+                    for (int i = 0; i < arr.length(); i++) {
+                        JSONObject emp = arr.getJSONObject(i);
+                        employees.add(new Employee(
+                                emp.getInt("id"),
+                                emp.getString("name"),
+                                emp.getString("role")
+                        ));
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    setDefaultEmployees();
+                }
+            }
+
+            @Override
+            public void onError(String error) {
+                setDefaultEmployees();
+            }
+        });
+    }
+
+    private void setDefaultEmployees() {
+        employees.clear();
+        employees.add(new Employee(1, "Владислав", "dm"));
+        employees.add(new Employee(2, "Николай", "senior_seller"));
+        employees.add(new Employee(3, "Алена", "seller"));
+        employees.add(new Employee(4, "Диана", "seller"));
     }
 
     private void loadFromServer() {
@@ -106,12 +206,19 @@ public class ScheduleFragment extends Fragment {
                     for (Iterator<String> it = schedule.keys(); it.hasNext(); ) {
                         String day = it.next();
                         JSONObject data = schedule.getJSONObject(day);
-                        shifts.put(currentYear + "-" + (currentMonth + 1) + "-" + day,
-                                new ShiftData(data.getString("employee"), data.getString("shift_time")));
+                        String employee = data.getString("employee");
+                        String shiftTime = data.getString("shift_time");
+
+                        String key = currentYear + "-" + (currentMonth + 1) + "-" + day;
+                        if (!shifts.containsKey(key)) {
+                            shifts.put(key, new ArrayList<>());
+                        }
+                        shifts.get(key).add(new ShiftData(employee, shiftTime));
                     }
                     updateCalendar();
                 } catch (Exception e) {
                     e.printStackTrace();
+                    updateCalendar();
                 }
             }
 
@@ -146,6 +253,7 @@ public class ScheduleFragment extends Fragment {
 
     private void updateCalendar() {
         if (getContext() == null || tableSchedule == null) return;
+
         String[] monthNames = {"Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
                 "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"};
         tvMonthYear.setText(monthNames[currentMonth] + " " + currentYear);
@@ -157,22 +265,53 @@ public class ScheduleFragment extends Fragment {
         int daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
 
         tableSchedule.removeAllViews();
-        int day = 1, rowCount = 0;
+
+        // Заголовки дней недели
+        TableRow headerRow = new TableRow(getContext());
+        String[] weekDays = {"ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ", "ВС"};
+        for (String dayName : weekDays) {
+            TextView header = new TextView(getContext());
+            header.setText(dayName);
+            header.setPadding(8, 10, 8, 10);
+            header.setGravity(Gravity.CENTER);
+            header.setTypeface(Typeface.DEFAULT_BOLD);
+            header.setBackgroundColor(0xFFE0E0E0);
+            header.setLayoutParams(new TableRow.LayoutParams(0, TableRow.LayoutParams.WRAP_CONTENT, 1f));
+            headerRow.addView(header);
+        }
+        tableSchedule.addView(headerRow);
+
+        int day = 1;
+        int rowCount = 0;
 
         while (day <= daysInMonth) {
             TableRow row = new TableRow(getContext());
             for (int col = 0; col < 7; col++) {
                 TextView cell = new TextView(getContext());
-                cell.setPadding(8, 12, 8, 12);
-                cell.setGravity(android.view.Gravity.CENTER);
-                cell.setBackgroundColor(0xFFFFFFFF);
+                cell.setPadding(4, 8, 4, 8);
+                cell.setGravity(Gravity.CENTER);
+                cell.setTextSize(11);
+                cell.setLayoutParams(new TableRow.LayoutParams(0, TableRow.LayoutParams.WRAP_CONTENT, 1f));
 
                 if (rowCount == 0 && col < firstDayOfWeek) {
                     cell.setText("");
                     cell.setBackgroundColor(0xFFEEEEEE);
                 } else if (day <= daysInMonth) {
                     final int currentDay = day;
-                    cell.setText(String.valueOf(day));
+
+                    String key = currentYear + "-" + (currentMonth + 1) + "-" + day;
+                    List<ShiftData> dayShifts = shifts.get(key);
+
+                    if (dayShifts != null && !dayShifts.isEmpty()) {
+                        String shortStatus = getShortStatus(dayShifts.get(0).shiftTime);
+                        cell.setText(day + "\n" + shortStatus);
+                        cell.setTextSize(10);
+                        cell.setBackgroundColor(getStatusColor(dayShifts.get(0).shiftTime));
+                    } else {
+                        cell.setText(String.valueOf(day));
+                        cell.setBackgroundColor(0xFFFFFFFF);
+                    }
+
                     cell.setClickable(true);
                     cell.setOnClickListener(v -> {
                         selectedDay = currentDay;
@@ -180,17 +319,11 @@ public class ScheduleFragment extends Fragment {
                         updateCalendar();
                     });
 
-                    String key = currentYear + "-" + (currentMonth + 1) + "-" + day;
-                    ShiftData data = shifts.get(key);
-                    if (data != null) {
-                        String status = getStatusChar(data.shiftTime);
-                        cell.setText(day + "\n" + status);
-                        cell.setTextSize(10);
-                        cell.setBackgroundColor(getStatusColor(status));
-                    }
                     if (selectedDay == day) {
                         cell.setBackgroundColor(0xFF2196F3);
                         cell.setTextColor(0xFFFFFFFF);
+                    } else {
+                        cell.setTextColor(0xFF000000);
                     }
                     day++;
                 } else {
@@ -202,57 +335,122 @@ public class ScheduleFragment extends Fragment {
             tableSchedule.addView(row);
             rowCount++;
         }
-        if (selectedDay == 0) selectedDay = 1;
-        showDayInfo(selectedDay);
-    }
 
-    private String getStatusChar(String shiftTime) {
-        if (shiftTime == null) return "?";
-        if (shiftTime.equals("Выходной")) return "О";
-        if (shiftTime.equals("Больничный")) return "Б";
-        return "Р";
-    }
-
-    private int getStatusColor(String status) {
-        switch (status) {
-            case "Р": return 0xFF4CAF50;
-            case "О": return 0xFFF44336;
-            case "Б": return 0xFFFF9800;
-            default: return 0xFFFFFFFF;
+        if (selectedDay == 0 && daysInMonth > 0) {
+            selectedDay = 1;
+        }
+        if (selectedDay > 0) {
+            showDayInfo(selectedDay);
         }
     }
 
     private void showDayInfo(int day) {
         if (getContext() == null) return;
+
         String[] weekDays = {"Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"};
         Calendar cal = Calendar.getInstance();
         cal.set(currentYear, currentMonth, day);
         int weekday = cal.get(Calendar.DAY_OF_WEEK) - 2;
         if (weekday < 0) weekday = 6;
-        tvSelectedDate.setText(weekDays[weekday] + " - " + day + " " + tvMonthYear.getText());
+
+        String[] monthNames = {"Января", "Февраля", "Марта", "Апреля", "Мая", "Июня",
+                "Июля", "Августа", "Сентября", "Октября", "Ноября", "Декабря"};
+        tvSelectedDate.setText(weekDays[weekday] + " - " + day + " " + monthNames[currentMonth] + " " + currentYear);
+
+        llEmployeesList.removeAllViews();
 
         String key = currentYear + "-" + (currentMonth + 1) + "-" + day;
-        ShiftData data = shifts.get(key);
-        if (data != null) {
-            tvEmployeeInfo.setText(data.employee.equals(currentEmployee) ? data.employee + " (Я)" : data.employee);
-            tvShiftTime.setText(data.shiftTime);
+        List<ShiftData> dayShifts = shifts.get(key);
+
+        if (dayShifts != null && !dayShifts.isEmpty()) {
+            for (ShiftData data : dayShifts) {
+                View employeeCard = createEmployeeCard(data.employee, data.shiftTime, data.employee.equals(currentEmployee));
+                llEmployeesList.addView(employeeCard);
+            }
         } else {
-            tvEmployeeInfo.setText("Не назначен");
-            tvShiftTime.setText("—");
+            TextView tvEmpty = new TextView(getContext());
+            tvEmpty.setText("На этот день никто не назначен");
+            tvEmpty.setPadding(16, 24, 16, 24);
+            tvEmpty.setTextSize(14);
+            tvEmpty.setTextColor(0xFF999999);
+            tvEmpty.setGravity(Gravity.CENTER);
+            llEmployeesList.addView(tvEmpty);
         }
-        tvUpdateTime.setText("Последнее обновление: " + new java.text.SimpleDateFormat("dd.MM.yyyy HH:mm").format(new java.util.Date()));
+
+        tvUpdateTime.setText("Последнее обновление: " + new java.text.SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(new java.util.Date()));
+    }
+
+    private View createEmployeeCard(String name, String shiftTime, boolean isCurrentUser) {
+        LinearLayout card = new LinearLayout(getContext());
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setPadding(16, 14, 16, 14);
+        card.setBackgroundColor(Color.WHITE);
+        card.setElevation(2f);
+
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        params.setMargins(0, 0, 0, 8);
+        card.setLayoutParams(params);
+        card.setWeightSum(2);
+
+        TextView tvName = new TextView(getContext());
+        tvName.setText(name + (isCurrentUser ? " (Я)" : ""));
+        tvName.setTextSize(14);
+        tvName.setTypeface(Typeface.DEFAULT_BOLD);
+        tvName.setTextColor(0xFF333333);
+        tvName.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView tvShift = new TextView(getContext());
+        tvShift.setText(getDisplayText(shiftTime));
+        tvShift.setTextSize(12);
+        tvShift.setTextColor(getShiftTextColor(shiftTime));
+        tvShift.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        tvShift.setGravity(Gravity.END);
+
+        card.addView(tvName);
+        card.addView(tvShift);
+
+        return card;
     }
 
     private void showEditDialog() {
-        if (getContext() == null) return;
-        String[] employees = {"Анна", "Сергей", "Мария", "Дмитрий"};
-        String[] times = {"09:00-18:00", "10:00-19:00", "12:00-21:00", "Выходной", "Больничный"};
+        if (getContext() == null || employees.isEmpty()) return;
+
+        String[] employeeNames = new String[employees.size()];
+        for (int i = 0; i < employees.size(); i++) {
+            employeeNames[i] = employees.get(i).name;
+        }
+
+        String[] times = {"09:00-18:00", "10:00-19:00", "12:00-21:00", "Выходной", "Отпуск", "Больничный", "Другой офис"};
 
         View dialogView = getLayoutInflater().inflate(R.layout.dialog_shift, null);
         Spinner spinnerEmployee = dialogView.findViewById(R.id.spinnerEmployee);
         Spinner spinnerTime = dialogView.findViewById(R.id.spinnerTime);
-        spinnerEmployee.setAdapter(new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_dropdown_item, employees));
-        spinnerTime.setAdapter(new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_dropdown_item, times));
+
+        ArrayAdapter<String> employeeAdapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_dropdown_item, employeeNames);
+        ArrayAdapter<String> timeAdapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_dropdown_item, times);
+        spinnerEmployee.setAdapter(employeeAdapter);
+        spinnerTime.setAdapter(timeAdapter);
+
+        String key = currentYear + "-" + (currentMonth + 1) + "-" + selectedDay;
+        List<ShiftData> currentShifts = shifts.get(key);
+
+        if (currentShifts != null && !currentShifts.isEmpty()) {
+            ShiftData currentData = currentShifts.get(0);
+            for (int i = 0; i < employeeNames.length; i++) {
+                if (employeeNames[i].equals(currentData.employee)) {
+                    spinnerEmployee.setSelection(i);
+                    break;
+                }
+            }
+            for (int i = 0; i < times.length; i++) {
+                if (times[i].equals(currentData.shiftTime)) {
+                    spinnerTime.setSelection(i);
+                    break;
+                }
+            }
+        }
 
         new AlertDialog.Builder(getContext())
                 .setTitle("Смена на " + selectedDay + " " + tvMonthYear.getText())
@@ -260,7 +458,11 @@ public class ScheduleFragment extends Fragment {
                 .setPositiveButton("Сохранить", (dialog, which) -> {
                     String employee = spinnerEmployee.getSelectedItem().toString();
                     String time = spinnerTime.getSelectedItem().toString();
-                    shifts.put(currentYear + "-" + (currentMonth + 1) + "-" + selectedDay, new ShiftData(employee, time));
+
+                    List<ShiftData> newShifts = new ArrayList<>();
+                    newShifts.add(new ShiftData(employee, time));
+                    shifts.put(key, newShifts);
+
                     saveToServer(selectedDay, employee, time);
                     updateCalendar();
                 })
@@ -273,6 +475,16 @@ public class ScheduleFragment extends Fragment {
         ShiftData(String employee, String shiftTime) {
             this.employee = employee;
             this.shiftTime = shiftTime;
+        }
+    }
+
+    static class Employee {
+        int id;
+        String name, role;
+        Employee(int id, String name, String role) {
+            this.id = id;
+            this.name = name;
+            this.role = role;
         }
     }
 }

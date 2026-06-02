@@ -30,9 +30,18 @@ public class MainMenuActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main_menu);
 
+        // ✅ ИСПРАВЛЕНО: убираем конфликт с ActionBar
         Toolbar toolbar = findViewById(R.id.toolbar);
-        setSupportActionBar(toolbar);
-        getSupportActionBar().setDisplayShowTitleEnabled(false);
+        if (toolbar != null) {
+            try {
+                setSupportActionBar(toolbar);
+                if (getSupportActionBar() != null) {
+                    getSupportActionBar().setDisplayShowTitleEnabled(false);
+                }
+            } catch (IllegalStateException e) {
+                e.printStackTrace();
+            }
+        }
 
         tvTitle = findViewById(R.id.tvTitle);
         viewPager = findViewById(R.id.viewPager);

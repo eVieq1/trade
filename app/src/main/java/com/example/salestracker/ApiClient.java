@@ -360,4 +360,53 @@ public class ApiClient {
             }
         });
     }
+
+    // ==================== НОВЫЙ МЕТОД ДЛЯ ПОЛУЧЕНИЯ СПИСКА СОТРУДНИКОВ ====================
+    public void getEmployees(ApiCallback callback) {
+        executor.execute(new Runnable() {
+            @Override
+            public void run() {
+                HttpURLConnection conn = null;
+                try {
+                    final String urlString = BASE_URL + "get_employees.php";
+                    URL url = new URL(urlString);
+                    conn = (HttpURLConnection) url.openConnection();
+                    conn.setRequestMethod("GET");
+                    conn.setConnectTimeout(15000);
+                    conn.setReadTimeout(15000);
+                    conn.setRequestProperty("Accept", "application/json");
+
+                    final int responseCode = conn.getResponseCode();
+
+                    if (responseCode == 200) {
+                        Scanner s = new Scanner(conn.getInputStream(), "UTF-8").useDelimiter("\\A");
+                        final String response = s.hasNext() ? s.next() : "";
+                        handler.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                callback.onSuccess(response);
+                            }
+                        });
+                    } else {
+                        handler.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                callback.onError("HTTP " + responseCode);
+                            }
+                        });
+                    }
+                } catch (Exception e) {
+                    final String error = e.getMessage();
+                    handler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            callback.onError("Ошибка: " + error);
+                        }
+                    });
+                } finally {
+                    if (conn != null) conn.disconnect();
+                }
+            }
+        });
+    }
 }
