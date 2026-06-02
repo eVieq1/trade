@@ -14,7 +14,6 @@ import androidx.recyclerview.widget.RecyclerView;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
 public class EditDayScheduleDialog extends Dialog {
@@ -86,6 +85,7 @@ public class EditDayScheduleDialog extends Dialog {
                     JSONObject schedule = obj.getJSONObject("schedule");
                     shifts.clear();
 
+                    // ИСПРАВЛЕНО: int day преобразуем в String
                     String key = String.valueOf(day);
                     if (schedule.has(key)) {
                         JSONArray dayArray = schedule.getJSONArray(key);
