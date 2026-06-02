@@ -29,6 +29,7 @@ public class ScheduleFragment extends Fragment {
     private SwipeRefreshLayout swipeRefresh;
 
     private int currentYear, currentMonth;
+    // КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: List<ShiftData> для нескольких сотрудников в день
     private Map<String, List<ShiftData>> shifts = new HashMap<>();
     private List<Employee> employees = new ArrayList<>();
     private boolean isAdmin = false;
@@ -199,9 +200,10 @@ public class ScheduleFragment extends Fragment {
                     JSONObject obj = new JSONObject(response);
                     JSONObject schedule = obj.getJSONObject("schedule");
                     shifts.clear();
+
+                    // КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: парсим МАССИВ сотрудников для каждого дня
                     for (Iterator<String> it = schedule.keys(); it.hasNext(); ) {
                         String day = it.next();
-                        // Новая структура: массив сотрудников
                         JSONArray dayArray = schedule.getJSONArray(day);
                         List<ShiftData> dayShifts = new ArrayList<>();
                         for (int i = 0; i < dayArray.length(); i++) {
@@ -359,6 +361,7 @@ public class ScheduleFragment extends Fragment {
         List<ShiftData> dayShifts = shifts.get(key);
 
         if (dayShifts != null && !dayShifts.isEmpty()) {
+            // КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: показываем ВСЕХ сотрудников
             for (ShiftData data : dayShifts) {
                 View employeeCard = createEmployeeCard(data.employee, data.shiftTime, data.employee.equals(currentEmployee));
                 llEmployeesList.addView(employeeCard);
