@@ -21,7 +21,7 @@ import java.util.*;
 
 public class ScheduleFragment extends Fragment {
 
-    private TableLayout tableSchedule;
+    private GridView gridSchedule;
     private TextView tvMonthYear, tvSelectedDate, tvUpdateTime;
     private LinearLayout llEmployeesList;
     private Button btnPrevMonth, btnNextMonth;
@@ -29,13 +29,96 @@ public class ScheduleFragment extends Fragment {
     private SwipeRefreshLayout swipeRefresh;
 
     private int currentYear, currentMonth;
-    // КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: List<ShiftData> для нескольких сотрудников в день
     private Map<String, List<ShiftData>> shifts = new HashMap<>();
     private List<Employee> employees = new ArrayList<>();
     private boolean isAdmin = false;
     private int selectedDay = 0;
     private ApiClient apiClient;
     private String currentEmployee;
+
+    // Адаптер для GridView
+    private class CalendarAdapter extends BaseAdapter {
+        private List<CalendarDay> days = new ArrayList<>();
+
+        public void setDays(List<CalendarDay> days) {
+            this.days = days;
+            notifyDataSetChanged();
+        }
+
+        @Override
+        public int getCount() { return days.size(); }
+
+        @Override
+        public Object getItem(int position) { return days.get(position); }
+
+        @Override
+        public long getItemId(int position) { return position; }
+
+        @Override
+        public View getView(int position, View convertView, ViewGroup parent) {
+            int cellSizePx = (int) (45 * getResources().getDisplayMetrics().density);
+
+            if (convertView == null) {
+                convertView = new TextView(getContext());
+                convertView.setLayoutParams(new GridView.LayoutParams(
+                        GridView.LayoutParams.MATCH_PARENT,
+                        cellSizePx));
+                ((TextView) convertView).setGravity(Gravity.CENTER);
+                ((TextView) convertView).setTextSize(10);
+            }
+
+            TextView cell = (TextView) convertView;
+            CalendarDay day = days.get(position);
+
+            if (day.isEmpty) {
+                cell.setText("");
+                cell.setBackgroundColor(0xFFEEEEEE);
+            } else {
+                if (day.isCurrentUserHere) {
+                    cell.setText(day.dayNumber + "\n" + getShortStatus(day.status));
+                    cell.setTextSize(9);
+                    cell.setBackgroundColor(getCellColorByStatus(day.status));
+                } else {
+                    cell.setText(String.valueOf(day.dayNumber));
+                    cell.setBackgroundColor(0xFFFFFFFF);
+                }
+
+                if (selectedDay == day.dayNumber && day.dayNumber > 0) {
+                    cell.setBackgroundColor(0xFF2196F3);
+                    cell.setTextColor(0xFFFFFFFF);
+                } else {
+                    cell.setTextColor(0xFF000000);
+                }
+
+                final int finalDay = day.dayNumber;
+                cell.setOnClickListener(v -> {
+                    if (finalDay > 0) {
+                        selectedDay = finalDay;
+                        showDayInfo(selectedDay);
+                        notifyDataSetChanged();
+                    }
+                });
+            }
+
+            return convertView;
+        }
+    }
+
+    private static class CalendarDay {
+        int dayNumber;
+        boolean isEmpty;
+        boolean isCurrentUserHere;
+        String status;
+
+        CalendarDay(int dayNumber, boolean isEmpty, boolean isCurrentUserHere, String status) {
+            this.dayNumber = dayNumber;
+            this.isEmpty = isEmpty;
+            this.isCurrentUserHere = isCurrentUserHere;
+            this.status = status;
+        }
+    }
+
+    private CalendarAdapter calendarAdapter;
 
     private String getDisplayText(String shiftTime) {
         if (shiftTime == null) return "?";
@@ -65,28 +148,28 @@ public class ScheduleFragment extends Fragment {
         }
     }
 
-    private int getStatusColor(String shiftTime) {
+    private int getCellColorByStatus(String shiftTime) {
         if (shiftTime == null) return 0xFFFFFFFF;
         switch (shiftTime) {
-            case "09:00-18:00": return 0xFFA5D6A7;
-            case "10:00-19:00": return 0xFFA5D6A7;
-            case "12:00-21:00": return 0xFFA5D6A7;
-            case "Выходной": return 0xFF90CAF9;
+            case "09:00-18:00": return 0xFFC8E6C9;
+            case "10:00-19:00": return 0xFFC8E6C9;
+            case "12:00-21:00": return 0xFFC8E6C9;
+            case "Выходной": return 0xFFBBDEFB;
             case "Отпуск": return 0xFFFFFFFF;
             case "Больничный": return 0xFFFFFFFF;
-            case "Другой офис": return 0xFFFFF59D;
+            case "Другой офис": return 0xFFFFF9C4;
             default: return 0xFFFFFFFF;
         }
     }
 
-    private int getShiftTextColor(String shiftTime) {
+    private int getCardTextColor(String shiftTime) {
         if (shiftTime == null) return 0xFF333333;
         switch (shiftTime) {
-            case "Выходной": return 0xFF1976D2;
-            case "Отпуск": return 0xFFF57C00;
+            case "Выходной": return 0xFF1565C0;
+            case "Отпуск": return 0xFFE65100;
             case "Больничный": return 0xFF757575;
-            case "Другой офис": return 0xFFF9A825;
-            default: return 0xFF4CAF50;
+            case "Другой офис": return 0xFFF57F17;
+            default: return 0xFF2E7D32;
         }
     }
 
@@ -97,7 +180,7 @@ public class ScheduleFragment extends Fragment {
         apiClient = new ApiClient();
 
         swipeRefresh = view.findViewById(R.id.swipeRefresh);
-        tableSchedule = view.findViewById(R.id.tableSchedule);
+        gridSchedule = view.findViewById(R.id.gridSchedule);
         tvMonthYear = view.findViewById(R.id.tvMonthYear);
         tvSelectedDate = view.findViewById(R.id.tvSelectedDate);
         tvUpdateTime = view.findViewById(R.id.tvUpdateTime);
@@ -105,6 +188,12 @@ public class ScheduleFragment extends Fragment {
         btnPrevMonth = view.findViewById(R.id.btnPrevMonth);
         btnNextMonth = view.findViewById(R.id.btnNextMonth);
         btnEditShift = view.findViewById(R.id.btnEditShift);
+
+        calendarAdapter = new CalendarAdapter();
+        gridSchedule.setAdapter(calendarAdapter);
+        gridSchedule.setNumColumns(7);
+        gridSchedule.setVerticalSpacing(0);
+        gridSchedule.setHorizontalSpacing(0);
 
         SharedPreferences prefs = requireActivity().getSharedPreferences("app", Context.MODE_PRIVATE);
         currentEmployee = prefs.getString("employee_name", "");
@@ -201,7 +290,6 @@ public class ScheduleFragment extends Fragment {
                     JSONObject schedule = obj.getJSONObject("schedule");
                     shifts.clear();
 
-                    // КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: парсим МАССИВ сотрудников для каждого дня
                     for (Iterator<String> it = schedule.keys(); it.hasNext(); ) {
                         String day = it.next();
                         JSONArray dayArray = schedule.getJSONArray(day);
@@ -225,7 +313,7 @@ public class ScheduleFragment extends Fragment {
             @Override
             public void onError(String error) {
                 if (getContext() != null) {
-                    Toast.makeText(getContext(), "Ошибка загрузки: " + error, Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getContext(), "Ошибка: " + error, Toast.LENGTH_SHORT).show();
                 }
                 updateCalendar();
             }
@@ -252,7 +340,7 @@ public class ScheduleFragment extends Fragment {
     }
 
     private void updateCalendar() {
-        if (getContext() == null || tableSchedule == null) return;
+        if (getContext() == null || gridSchedule == null) return;
 
         String[] monthNames = {"Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
                 "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"};
@@ -264,75 +352,41 @@ public class ScheduleFragment extends Fragment {
         if (firstDayOfWeek < 0) firstDayOfWeek = 6;
         int daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
 
-        tableSchedule.removeAllViews();
+        List<CalendarDay> daysList = new ArrayList<>();
 
-        TableRow headerRow = new TableRow(getContext());
-        String[] weekDays = {"ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ", "ВС"};
-        for (String dayName : weekDays) {
-            TextView header = new TextView(getContext());
-            header.setText(dayName);
-            header.setPadding(12, 12, 12, 12);
-            header.setGravity(Gravity.CENTER);
-            header.setTypeface(Typeface.DEFAULT_BOLD);
-            header.setBackgroundColor(0xFFE0E0E0);
-            header.setLayoutParams(new TableRow.LayoutParams(0, TableRow.LayoutParams.WRAP_CONTENT, 1f));
-            headerRow.addView(header);
+        // Пустые ячейки в начале месяца
+        for (int i = 0; i < firstDayOfWeek; i++) {
+            daysList.add(new CalendarDay(0, true, false, ""));
         }
-        tableSchedule.addView(headerRow);
 
-        int day = 1;
-        int rowCount = 0;
+        // Дни месяца
+        for (int day = 1; day <= daysInMonth; day++) {
+            String key = currentYear + "-" + (currentMonth + 1) + "-" + day;
+            List<ShiftData> dayShifts = shifts.get(key);
 
-        while (day <= daysInMonth) {
-            TableRow row = new TableRow(getContext());
-            for (int col = 0; col < 7; col++) {
-                TextView cell = new TextView(getContext());
-                cell.setPadding(8, 12, 8, 12);
-                cell.setGravity(Gravity.CENTER);
-                cell.setLayoutParams(new TableRow.LayoutParams(0, TableRow.LayoutParams.WRAP_CONTENT, 1f));
+            boolean isCurrentUserHere = false;
+            String currentUserStatus = "";
 
-                if (rowCount == 0 && col < firstDayOfWeek) {
-                    cell.setText("");
-                    cell.setBackgroundColor(0xFFEEEEEE);
-                } else if (day <= daysInMonth) {
-                    final int currentDay = day;
-
-                    String key = currentYear + "-" + (currentMonth + 1) + "-" + day;
-                    List<ShiftData> dayShifts = shifts.get(key);
-
-                    if (dayShifts != null && !dayShifts.isEmpty()) {
-                        String shortStatus = getShortStatus(dayShifts.get(0).shiftTime);
-                        cell.setText(day + "\n" + shortStatus);
-                        cell.setTextSize(10);
-                        cell.setBackgroundColor(getStatusColor(dayShifts.get(0).shiftTime));
-                    } else {
-                        cell.setText(String.valueOf(day));
-                        cell.setBackgroundColor(0xFFFFFFFF);
+            if (dayShifts != null && !dayShifts.isEmpty()) {
+                for (ShiftData data : dayShifts) {
+                    if (data.employee.equals(currentEmployee)) {
+                        isCurrentUserHere = true;
+                        currentUserStatus = data.shiftTime;
+                        break;
                     }
-
-                    cell.setClickable(true);
-                    cell.setOnClickListener(v -> {
-                        selectedDay = currentDay;
-                        showDayInfo(selectedDay);
-                        updateCalendar();
-                    });
-
-                    if (selectedDay == day) {
-                        cell.setBackgroundColor(0xFF2196F3);
-                        cell.setTextColor(0xFFFFFFFF);
-                    } else {
-                        cell.setTextColor(0xFF000000);
-                    }
-                    day++;
-                } else {
-                    cell.setText("");
-                    cell.setBackgroundColor(0xFFEEEEEE);
                 }
-                row.addView(cell);
             }
-            tableSchedule.addView(row);
-            rowCount++;
+
+            daysList.add(new CalendarDay(day, false, isCurrentUserHere, currentUserStatus));
         }
+
+        // Заполняем до 42 ячеек (6 строк * 7 дней)
+        int remaining = 42 - daysList.size();
+        for (int i = 0; i < remaining; i++) {
+            daysList.add(new CalendarDay(0, true, false, ""));
+        }
+
+        calendarAdapter.setDays(daysList);
 
         if (selectedDay == 0 && daysInMonth > 0) {
             selectedDay = 1;
@@ -361,7 +415,6 @@ public class ScheduleFragment extends Fragment {
         List<ShiftData> dayShifts = shifts.get(key);
 
         if (dayShifts != null && !dayShifts.isEmpty()) {
-            // КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: показываем ВСЕХ сотрудников
             for (ShiftData data : dayShifts) {
                 View employeeCard = createEmployeeCard(data.employee, data.shiftTime, data.employee.equals(currentEmployee));
                 llEmployeesList.addView(employeeCard);
@@ -384,7 +437,7 @@ public class ScheduleFragment extends Fragment {
         card.setOrientation(LinearLayout.HORIZONTAL);
         card.setPadding(16, 14, 16, 14);
         card.setBackgroundColor(Color.WHITE);
-        card.setElevation(2f);
+        card.setElevation(4f);
 
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -403,7 +456,7 @@ public class ScheduleFragment extends Fragment {
         TextView tvShift = new TextView(getContext());
         tvShift.setText(getDisplayText(shiftTime));
         tvShift.setTextSize(12);
-        tvShift.setTextColor(getShiftTextColor(shiftTime));
+        tvShift.setTextColor(getCardTextColor(shiftTime));
         tvShift.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         tvShift.setGravity(Gravity.END);
 

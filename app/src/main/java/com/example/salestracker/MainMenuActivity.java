@@ -3,6 +3,7 @@ package com.example.salestracker;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AlertDialog;
@@ -30,20 +31,17 @@ public class MainMenuActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main_menu);
 
-        // ✅ ИСПРАВЛЕНО: убираем конфликт с ActionBar
         Toolbar toolbar = findViewById(R.id.toolbar);
-        if (toolbar != null) {
-            try {
-                setSupportActionBar(toolbar);
-                if (getSupportActionBar() != null) {
-                    getSupportActionBar().setDisplayShowTitleEnabled(false);
-                }
-            } catch (IllegalStateException e) {
-                e.printStackTrace();
-            }
-        }
+        setSupportActionBar(toolbar);
+        getSupportActionBar().setDisplayShowTitleEnabled(false);
 
         tvTitle = findViewById(R.id.tvTitle);
+
+        // СКРЫВАЕМ ЗАГОЛОВОК "SalesTracker"
+        if (tvTitle != null) {
+            tvTitle.setVisibility(View.GONE);
+        }
+
         viewPager = findViewById(R.id.viewPager);
         bottomNavigation = findViewById(R.id.bottomNavigation);
 
