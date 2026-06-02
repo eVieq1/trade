@@ -24,7 +24,6 @@ public class ScheduleFragment extends Fragment {
     private GridView gridSchedule;
     private TextView tvMonthYear, tvSelectedDate, tvDirector, tvSpecialist, tvShiftTime, tvUpdateTime, tvPostalCode;
     private Button btnPrevMonth, btnNextMonth;
-    private ImageView btnEditShift;
     private SwipeRefreshLayout swipeRefresh;
     private LinearLayout llEmployeesList;
 
@@ -112,7 +111,6 @@ public class ScheduleFragment extends Fragment {
         tvPostalCode = view.findViewById(R.id.tvPostalCode);
         btnPrevMonth = view.findViewById(R.id.btnPrevMonth);
         btnNextMonth = view.findViewById(R.id.btnNextMonth);
-        btnEditShift = view.findViewById(R.id.btnEditShift);
         llEmployeesList = view.findViewById(R.id.llEmployeesList);
 
         gridSchedule.setAdapter(calendarAdapter);
@@ -123,13 +121,6 @@ public class ScheduleFragment extends Fragment {
         SharedPreferences prefs = requireActivity().getSharedPreferences("app", Context.MODE_PRIVATE);
         currentEmployee = prefs.getString("employee_name", "");
         isAdmin = prefs.getString("user_role", "seller").equals("dm");
-
-        if (isAdmin) {
-            btnEditShift.setVisibility(View.VISIBLE);
-            btnEditShift.setOnClickListener(v -> showEditDialog());
-        } else {
-            btnEditShift.setVisibility(View.GONE);
-        }
 
         swipeRefresh.setOnRefreshListener(() -> {
             loadEmployees();
@@ -258,7 +249,6 @@ public class ScheduleFragment extends Fragment {
 
         tvDirector.setText(currentEmployee);
 
-        // Очищаем список сотрудников
         llEmployeesList.removeAllViews();
 
         String specialist = "";
@@ -266,26 +256,38 @@ public class ScheduleFragment extends Fragment {
 
         if (dayShifts != null && !dayShifts.isEmpty()) {
             for (ShiftData data : dayShifts) {
-                // Создаем карточку для каждого сотрудника
-                TextView employeeCard = new TextView(getContext());
-                String displayText = data.employee + " — " + getDisplayText(data.shiftTime);
-                employeeCard.setText(displayText);
-                employeeCard.setPadding(16, 10, 16, 10);
-                employeeCard.setBackgroundColor(Color.WHITE);
-                employeeCard.setTextSize(13);
-                employeeCard.setTypeface(Typeface.DEFAULT_BOLD);
-                employeeCard.setTextColor(0xFF333333);
+                // Плашка каждого сотрудника
+                LinearLayout card = new LinearLayout(getContext());
+                card.setOrientation(LinearLayout.HORIZONTAL);
+                card.setPadding(16, 12, 16, 12);
+                card.setBackgroundColor(Color.WHITE);
+                card.setElevation(2f);
 
-                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT);
-                params.setMargins(0, 0, 0, 4);
-                employeeCard.setLayoutParams(params);
-                employeeCard.setElevation(2f);
+                cardParams.setMargins(0, 0, 0, 6);
+                card.setLayoutParams(cardParams);
 
-                llEmployeesList.addView(employeeCard);
+                TextView tvName = new TextView(getContext());
+                tvName.setText(data.employee);
+                tvName.setTextSize(14);
+                tvName.setTypeface(Typeface.DEFAULT_BOLD);
+                tvName.setTextColor(0xFF333333);
+                tvName.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
-                // Запоминаем первого НЕ текущего сотрудника для полей "Специалист"
+                TextView tvStatus = new TextView(getContext());
+                tvStatus.setText(getDisplayText(data.shiftTime));
+                tvStatus.setTextSize(12);
+                tvStatus.setTextColor(getStatusColor(data.shiftTime));
+                tvStatus.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+                tvStatus.setGravity(Gravity.END);
+
+                card.addView(tvName);
+                card.addView(tvStatus);
+
+                llEmployeesList.addView(card);
+
                 if (!data.employee.equals(currentEmployee) && specialist.isEmpty()) {
                     specialist = data.employee;
                     shiftTime = data.shiftTime;
@@ -313,24 +315,47 @@ public class ScheduleFragment extends Fragment {
         tvUpdateTime.setText("Последнее обновление данных: " + new java.text.SimpleDateFormat("dd.MM.yyyy 'в' HH:mm", Locale.getDefault()).format(new java.util.Date()));
     }
 
+    private int getStatusColor(String shiftTime) {
+        if (shiftTime == null) return 0xFF999999;
+        switch (shiftTime) {
+            case "09:00-18:00": return 0xFF4CAF50;
+            case "10:00-19:00": return 0xFF4CAF50;
+            case "12:00-21:00": return 0xFF4CAF50;
+            case "Выходной": return 0xFFF44336;
+            case "Отпуск": return 0xFFFF9800;
+            case "Больничный": return 0xFF9E9E9E;
+            case "Другой офис": return 0xFF2196F3;
+            default: return 0xFF999999;
+        }
+    }
+
     private String getDisplayText(String shiftTime) {
         if (shiftTime == null) return "?";
         switch (shiftTime) {
-            case "09:00-18:00": return "Часы работы дневные";
-            case "10:00-19:00": return "Часы работы вечерние";
-            case "12:00-21:00": return "Часы работы ночные";
+            case "09:00-18:00": return "09:00-18:00";
+            case "10:00-19:00": return "10:00-19:00";
+            case "12:00-21:00": return "12:00-21:00";
             case "Выходной": return "Выходной";
             case "Отпуск": return "Отпуск";
             case "Больничный": return "Больничный";
-            case "Другой офис": return "Работа в другом офисе";
+            case "Другой офис": return "Другой офис";
             default: return shiftTime;
         }
     }
 
-    private void showEditDialog() {
-        if (employees.isEmpty()) return;
+    public void showEditDialog() {
+        if (getContext() == null || employees.isEmpty()) return;
 
-        String[] employeeNames = employees.stream().map(e -> e.name).toArray(String[]::new);
+        // Только для директора
+        if (!isAdmin) {
+            Toast.makeText(getContext(), "Доступ только для директора", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String[] employeeNames = new String[employees.size()];
+        for (int i = 0; i < employees.size(); i++) {
+            employeeNames[i] = employees.get(i).name;
+        }
         String[] times = {"09:00-18:00", "10:00-19:00", "12:00-21:00", "Выходной", "Отпуск", "Больничный", "Другой офис"};
 
         View dialogView = getLayoutInflater().inflate(R.layout.dialog_shift, null);

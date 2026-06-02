@@ -22,7 +22,9 @@ public class MainMenuActivity extends AppCompatActivity {
 
     private ViewPager2 viewPager;
     private BottomNavigationView bottomNavigation;
+    private TextView tvToolbarTitle;
     private TextView btnMenu;
+    private String[] titles = {"Продажи", "Графики", "Отчёты", "Рейтинг"};
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -33,6 +35,7 @@ public class MainMenuActivity extends AppCompatActivity {
         setSupportActionBar(toolbar);
         getSupportActionBar().setDisplayShowTitleEnabled(false);
 
+        tvToolbarTitle = findViewById(R.id.tvToolbarTitle);
         viewPager = findViewById(R.id.viewPager);
         bottomNavigation = findViewById(R.id.bottomNavigation);
         btnMenu = findViewById(R.id.btnMenu);
@@ -54,12 +57,16 @@ public class MainMenuActivity extends AppCompatActivity {
             int id = item.getItemId();
             if (id == R.id.nav_sales) {
                 viewPager.setCurrentItem(0);
+                tvToolbarTitle.setText(titles[0]);
             } else if (id == R.id.nav_schedule) {
                 viewPager.setCurrentItem(1);
+                tvToolbarTitle.setText(titles[1]);
             } else if (id == R.id.nav_reports) {
                 viewPager.setCurrentItem(2);
+                tvToolbarTitle.setText(titles[2]);
             } else if (id == R.id.nav_rating) {
                 viewPager.setCurrentItem(3);
+                tvToolbarTitle.setText(titles[3]);
             }
             return true;
         });
@@ -73,12 +80,15 @@ public class MainMenuActivity extends AppCompatActivity {
                     case 2: bottomNavigation.setSelectedItemId(R.id.nav_reports); break;
                     case 3: bottomNavigation.setSelectedItemId(R.id.nav_rating); break;
                 }
+                tvToolbarTitle.setText(titles[position]);
             }
         });
+
+        tvToolbarTitle.setText(titles[0]);
     }
 
     private void showMenuDialog() {
-        String[] items = {"Изменить планы", "Выход"};
+        String[] items = {"Изменить планы", "Редактировать смену", "Выход"};
 
         new AlertDialog.Builder(this)
                 .setTitle("Меню")
@@ -92,6 +102,14 @@ public class MainMenuActivity extends AppCompatActivity {
                             Toast.makeText(MainMenuActivity.this, "Доступ только для директора", Toast.LENGTH_SHORT).show();
                         }
                     } else if (which == 1) {
+                        // Получаем текущий фрагмент и вызываем редактирование смены
+                        Fragment currentFragment = getSupportFragmentManager().findFragmentByTag("f" + viewPager.getCurrentItem());
+                        if (currentFragment instanceof ScheduleFragment) {
+                            ((ScheduleFragment) currentFragment).showEditDialog();
+                        } else {
+                            Toast.makeText(MainMenuActivity.this, "Сначала перейдите на вкладку Графики", Toast.LENGTH_SHORT).show();
+                        }
+                    } else if (which == 2) {
                         getSharedPreferences("app", MODE_PRIVATE).edit().clear().apply();
                         startActivity(new Intent(MainMenuActivity.this, LoginActivity.class));
                         finish();

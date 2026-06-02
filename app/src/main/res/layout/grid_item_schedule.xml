@@ -1,28 +1,245 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.swiperefreshlayout.widget.SwipeRefreshLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/swipeRefresh"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:padding="8dp"
-    android:background="#FFFFFF"
-    android:gravity="center"
-    android:clickable="true"
-    android:focusable="true">
+    android:layout_height="match_parent"
+    android:background="#F5F5F5">
 
-    <TextView
-        android:id="@+id/tvDay"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:textSize="14sp"
-        android:textStyle="bold"
-        android:textColor="#333333" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:paddingTop="8dp">
 
-    <TextView
-        android:id="@+id/tvEmployeeShort"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:textSize="10sp"
-        android:textColor="#555555"
-        android:maxLines="1" />
+        <!-- Месяц (без карандаша) -->
+        <TextView
+            android:id="@+id/tvMonthYear"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Июнь 2026"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="#2196F3"
+            android:layout_marginBottom="8dp" />
 
-</LinearLayout>
+        <!-- Кнопки навигации -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="16dp">
+
+            <Button
+                android:id="@+id/btnPrevMonth"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="40dp"
+                android:text="◀ ПРЕДЫДУЩИЙ"
+                android:textSize="12sp"
+                android:backgroundTint="#2196F3" />
+
+            <Button
+                android:id="@+id/btnNextMonth"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="40dp"
+                android:text="СЛЕДУЮЩИЙ ▶"
+                android:textSize="12sp"
+                android:backgroundTint="#2196F3" />
+
+        </LinearLayout>
+
+        <!-- Заголовки дней недели -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="4dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="32dp"
+                android:text="ПН"
+                android:gravity="center"
+                android:textStyle="bold"
+                android:textColor="#333333"
+                android:background="#E0E0E0"
+                android:padding="8dp" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="32dp"
+                android:text="ВТ"
+                android:gravity="center"
+                android:textStyle="bold"
+                android:textColor="#333333"
+                android:background="#E0E0E0"
+                android:padding="8dp" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="32dp"
+                android:text="СР"
+                android:gravity="center"
+                android:textStyle="bold"
+                android:textColor="#333333"
+                android:background="#E0E0E0"
+                android:padding="8dp" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="32dp"
+                android:text="ЧТ"
+                android:gravity="center"
+                android:textStyle="bold"
+                android:textColor="#333333"
+                android:background="#E0E0E0"
+                android:padding="8dp" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="32dp"
+                android:text="ПТ"
+                android:gravity="center"
+                android:textStyle="bold"
+                android:textColor="#333333"
+                android:background="#E0E0E0"
+                android:padding="8dp" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="32dp"
+                android:text="СБ"
+                android:gravity="center"
+                android:textStyle="bold"
+                android:textColor="#333333"
+                android:background="#E0E0E0"
+                android:padding="8dp" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="32dp"
+                android:text="ВС"
+                android:gravity="center"
+                android:textStyle="bold"
+                android:textColor="#333333"
+                android:background="#E0E0E0"
+                android:padding="8dp" />
+
+        </LinearLayout>
+
+        <!-- Календарь -->
+        <GridView
+            android:id="@+id/gridSchedule"
+            android:layout_width="match_parent"
+            android:layout_height="220dp"
+            android:numColumns="7"
+            android:verticalSpacing="1dp"
+            android:horizontalSpacing="1dp"
+            android:stretchMode="columnWidth"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Адрес -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="г. Иваново, улица Куконковых, д. 141"
+            android:textSize="11sp"
+            android:textColor="#666666"
+            android:layout_marginBottom="2dp" />
+
+        <TextView
+            android:id="@+id/tvPostalCode"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="7101000"
+            android:textSize="11sp"
+            android:textColor="#666666"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Выбранная дата -->
+        <TextView
+            android:id="@+id/tvSelectedDate"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Понедельник - 1 июня"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:textColor="#333333"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Директор магазина"
+            android:textSize="12sp"
+            android:textColor="#666666" />
+
+        <TextView
+            android:id="@+id/tvDirector"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="#333333"
+            android:layout_marginBottom="6dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Специалист"
+            android:textSize="12sp"
+            android:textColor="#666666" />
+
+        <TextView
+            android:id="@+id/tvSpecialist"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="#333333" />
+
+        <!-- ПРОКРУТКА ТОЛЬКО ДЛЯ ПЛАШЕК СОТРУДНИКОВ -->
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="120dp"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="8dp">
+
+            <LinearLayout
+                android:id="@+id/llEmployeesList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+        </ScrollView>
+
+        <TextView
+            android:id="@+id/tvShiftTime"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textSize="12sp"
+            android:textColor="#555555"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:id="@+id/tvUpdateTime"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textSize="10sp"
+            android:textColor="#999999" />
+
+    </LinearLayout>
+</androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
