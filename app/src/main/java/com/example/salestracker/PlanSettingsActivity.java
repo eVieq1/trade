@@ -1,86 +1,96 @@
 package com.example.salestracker;
 
 import android.os.Bundle;
+import android.view.Gravity;
+import android.view.View;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
 import com.example.salestracker.R;
+import java.util.Calendar;
 
 public class PlanSettingsActivity extends AppCompatActivity {
 
-    private Spinner spinnerMonth;
-    private EditText etSim, etSampling, etGoodsRevenue, etFinanceRevenue, etInternet, etAccessories;
-    private EditText etSamsung, etRealme, etHuawei, etHonor, etInfinix, etTecho;
-    private Button btnSave;
-    private ApiClient apiClient;
-    private int currentYear = 2026;
+    private GridView gridDays;
+    private TextView tvMonthYear;
+    private int currentYear, currentMonth;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_plan_settings);
 
-        apiClient = new ApiClient();
+        Toolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        getSupportActionBar().setTitle("Изменить планы");
 
-        spinnerMonth = findViewById(R.id.spinnerMonth);
-        etSim = findViewById(R.id.etSim);
-        etSampling = findViewById(R.id.etSampling);
-        etGoodsRevenue = findViewById(R.id.etGoodsRevenue);
-        etFinanceRevenue = findViewById(R.id.etFinanceRevenue);
-        etInternet = findViewById(R.id.etInternet);
-        etAccessories = findViewById(R.id.etAccessories);
-        etSamsung = findViewById(R.id.etSamsung);
-        etRealme = findViewById(R.id.etRealme);
-        etHuawei = findViewById(R.id.etHuawei);
-        etHonor = findViewById(R.id.etHonor);
-        etInfinix = findViewById(R.id.etInfinix);
-        etTecho = findViewById(R.id.etTecho);
-        btnSave = findViewById(R.id.btnSavePlans);
+        tvMonthYear = findViewById(R.id.tvMonthYear);
+        gridDays = findViewById(R.id.gridDays);
 
-        // Месяцы
+        Calendar cal = Calendar.getInstance();
+        currentYear = cal.get(Calendar.YEAR);
+        currentMonth = cal.get(Calendar.MONTH);
+
+        tvMonthYear.setText(getMonthName(currentMonth) + " " + currentYear);
+        setupCalendar();
+    }
+
+    private void setupCalendar() {
+        Calendar cal = Calendar.getInstance();
+        cal.set(currentYear, currentMonth, 1);
+        int firstDayOfWeek = cal.get(Calendar.DAY_OF_WEEK) - 2;
+        if (firstDayOfWeek < 0) firstDayOfWeek = 6;
+        int daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
+
+        int totalCells = 42;
+        Integer[] days = new Integer[totalCells];
+        for (int i = 0; i < totalCells; i++) days[i] = 0;
+
+        for (int i = 0; i < daysInMonth; i++) {
+            days[firstDayOfWeek + i] = i + 1;
+        }
+
+        ArrayAdapter<Integer> adapter = new ArrayAdapter<Integer>(this, R.layout.grid_item_day, days) {
+            @Override
+            public View getView(int position, View convertView, ViewGroup parent) {
+                TextView view = (TextView) super.getView(position, convertView, parent);
+                if (view == null) {
+                    view = new TextView(PlanSettingsActivity.this);
+                }
+                int day = getItem(position);
+                view.setText(day == 0 ? "" : String.valueOf(day));
+                view.setGravity(Gravity.CENTER);
+                view.setPadding(8, 12, 8, 12);
+                view.setTextSize(14);
+                view.setBackgroundColor(day == 0 ? 0xFFEEEEEE : 0xFFFFFFFF);
+
+                if (day > 0) {
+                    final int selectedDay = day;
+                    view.setOnClickListener(v -> openDayEdit(selectedDay));
+                }
+                return view;
+            }
+        };
+
+        gridDays.setAdapter(adapter);
+        gridDays.setNumColumns(7);
+    }
+
+    private void openDayEdit(int day) {
+        EditDayScheduleDialog dialog = new EditDayScheduleDialog(this, currentYear, currentMonth + 1, day);
+        dialog.show();
+    }
+
+    private String getMonthName(int month) {
         String[] months = {"Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
                 "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"};
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, months);
-        spinnerMonth.setAdapter(adapter);
-
-        btnSave.setOnClickListener(v -> saveAllPlans());
+        return months[month];
     }
 
-    private void saveAllPlans() {
-        int month = spinnerMonth.getSelectedItemPosition() + 1;
-
-        savePlan("sim", getDouble(etSim), "qty");
-        savePlan("sampling", getDouble(etSampling), "qty");
-        savePlan("goods_revenue", getDouble(etGoodsRevenue), "money");
-        savePlan("finance_revenue", getDouble(etFinanceRevenue), "money");
-        savePlan("internet", getDouble(etInternet), "qty");
-        savePlan("accessories", getDouble(etAccessories), "money");
-        savePlan("samsung", getDouble(etSamsung), "money");
-        savePlan("realme", getDouble(etRealme), "money");
-        savePlan("huawei", getDouble(etHuawei), "money");
-        savePlan("honor", getDouble(etHonor), "money");
-        savePlan("infinix", getDouble(etInfinix), "money");
-        savePlan("techo", getDouble(etTecho), "money");
-
-        Toast.makeText(this, "✅ Планы сохранены", Toast.LENGTH_SHORT).show();
+    @Override
+    public boolean onSupportNavigateUp() {
         finish();
-    }
-
-    private double getDouble(EditText et) {
-        String text = et.getText().toString().trim();
-        if (text.isEmpty()) return 0;
-        return Double.parseDouble(text);
-    }
-
-    private void savePlan(String category, double target, String unitType) {
-        apiClient.savePlan(currentYear, spinnerMonth.getSelectedItemPosition() + 1, category, target, unitType, new ApiClient.ApiCallback() {
-            @Override
-            public void onSuccess(String response) {
-                // Успешно
-            }
-            @Override
-            public void onError(String error) {
-                Toast.makeText(PlanSettingsActivity.this, "Ошибка: " + error, Toast.LENGTH_SHORT).show();
-            }
-        });
+        return true;
     }
 }
