@@ -38,7 +38,7 @@ public class EditDayScheduleDialog extends Dialog {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.edit_day_schedule_dialog); // ИСПРАВЛЕНО
+        setContentView(R.layout.edit_day_schedule_dialog);
 
         setTitle("Смены на " + day + "." + month + "." + year);
 
