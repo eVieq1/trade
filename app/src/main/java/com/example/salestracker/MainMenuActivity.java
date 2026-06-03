@@ -33,9 +33,8 @@ public class MainMenuActivity extends AppCompatActivity {
 
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
-        if (getSupportActionBar() != null) {
-            getSupportActionBar().setDisplayShowTitleEnabled(false);
-        }
+        getSupportActionBar().setDisplayShowTitleEnabled(false);
+        getSupportActionBar().setElevation(0);
 
         tvToolbarTitle = findViewById(R.id.tvToolbarTitle);
         viewPager = findViewById(R.id.viewPager);
@@ -44,7 +43,7 @@ public class MainMenuActivity extends AppCompatActivity {
 
         viewPager.setUserInputEnabled(false);
 
-        btnMenu.setOnClickListener(v -> showMenuDialog());
+        btnMenu.setOnClickListener(v -> showContextMenu());
 
         List<Fragment> fragments = new ArrayList<>();
         fragments.add(new SalesFragment());
@@ -77,18 +76,10 @@ public class MainMenuActivity extends AppCompatActivity {
             @Override
             public void onPageSelected(int position) {
                 switch (position) {
-                    case 0:
-                        bottomNavigation.setSelectedItemId(R.id.nav_sales);
-                        break;
-                    case 1:
-                        bottomNavigation.setSelectedItemId(R.id.nav_schedule);
-                        break;
-                    case 2:
-                        bottomNavigation.setSelectedItemId(R.id.nav_reports);
-                        break;
-                    case 3:
-                        bottomNavigation.setSelectedItemId(R.id.nav_rating);
-                        break;
+                    case 0: bottomNavigation.setSelectedItemId(R.id.nav_sales); break;
+                    case 1: bottomNavigation.setSelectedItemId(R.id.nav_schedule); break;
+                    case 2: bottomNavigation.setSelectedItemId(R.id.nav_reports); break;
+                    case 3: bottomNavigation.setSelectedItemId(R.id.nav_rating); break;
                 }
                 tvToolbarTitle.setText(titles[position]);
             }
@@ -97,57 +88,64 @@ public class MainMenuActivity extends AppCompatActivity {
         tvToolbarTitle.setText(titles[0]);
     }
 
-    private void showMenuDialog() {
-        int currentTab = viewPager.getCurrentItem();
-        String[] items;
-        String title = "Меню";
+    private void showContextMenu() {
+        int currentPage = viewPager.getCurrentItem();
+        final String[] items;
 
-        if (currentTab == 0) { // Продажи
-            Toast.makeText(this, "Меню недоступно на этой вкладке", Toast.LENGTH_SHORT).show();
-            return;
-        } else if (currentTab == 1) { // Графики
-            // ДОБАВЛЕНА КНОПКА "ОБНОВИТЬ"
-            items = new String[]{"Редактировать смену", "Обновить", "Выход"};
-            title = "Графики";
-        } else if (currentTab == 2) { // Отчёты
-            items = new String[]{"Изменить планы", "Выход"};
-            title = "Отчёты";
-        } else { // Рейтинг
-            Toast.makeText(this, "Меню недоступно на этой вкладке", Toast.LENGTH_SHORT).show();
-            return;
+        switch (currentPage) {
+            case 0: // Продажи
+                items = new String[]{"Выход"};
+                break;
+            case 1: // Графики
+                items = new String[]{"Редактировать смену", "Обновить", "Экспорт в CSV", "Импорт из CSV", "Выход"};
+                break;
+            case 2: // Отчёты
+                items = new String[]{"Изменить планы", "Выход"};
+                break;
+            case 3: // Рейтинг
+                items = new String[]{"Выход"};
+                break;
+            default:
+                items = new String[]{"Выход"};
+                break;
         }
 
+        final int exitIndex = items.length - 1;
+
         new AlertDialog.Builder(this)
-                .setTitle(title)
+                .setTitle("Меню")
                 .setItems(items, (dialog, which) -> {
-                    if (items[which].equals("Редактировать смену")) {
-                        Fragment currentFragment = getSupportFragmentManager()
-                                .findFragmentByTag("f" + viewPager.getCurrentItem());
+                    // Проверяем, выбран ли "Выход" (последний пункт)
+                    if (which == exitIndex) {
+                        getSharedPreferences("app", MODE_PRIVATE).edit().clear().apply();
+                        startActivity(new Intent(MainMenuActivity.this, LoginActivity.class));
+                        finish();
+                        return;
+                    }
+
+                    // Обработка остальных пунктов меню
+                    if (currentPage == 1) {
+                        Fragment currentFragment = getSupportFragmentManager().findFragmentByTag("f" + currentPage);
                         if (currentFragment instanceof ScheduleFragment) {
-                            ((ScheduleFragment) currentFragment).showEditDialog();
-                        } else {
-                            Toast.makeText(this, "Ошибка: фрагмент не найден", Toast.LENGTH_SHORT).show();
+                            ScheduleFragment scheduleFragment = (ScheduleFragment) currentFragment;
+                            if (which == 0) {
+                                scheduleFragment.showEditDialog();
+                            } else if (which == 1) {
+                                scheduleFragment.refreshData();
+                            } else if (which == 2) {
+                                scheduleFragment.exportToExcel();
+                            } else if (which == 3) {
+                                scheduleFragment.importFromExcel();
+                            }
                         }
-                    } else if (items[which].equals("Обновить")) {
-                        // ОБНОВЛЕНИЕ ДАННЫХ НА СТРАНИЦЕ ГРАФИКОВ
-                        Fragment currentFragment = getSupportFragmentManager()
-                                .findFragmentByTag("f" + viewPager.getCurrentItem());
-                        if (currentFragment instanceof ScheduleFragment) {
-                            ((ScheduleFragment) currentFragment).refreshData();
-                            Toast.makeText(this, "🔄 Данные обновлены", Toast.LENGTH_SHORT).show();
-                        }
-                    } else if (items[which].equals("Изменить планы")) {
+                    } else if (currentPage == 2 && which == 0) {
                         SharedPreferences prefs = getSharedPreferences("app", MODE_PRIVATE);
                         String userRole = prefs.getString("user_role", "seller");
                         if (userRole.equals("dm")) {
                             startActivity(new Intent(MainMenuActivity.this, PlanSettingsActivity.class));
                         } else {
-                            Toast.makeText(this, "Доступ только для директора", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(MainMenuActivity.this, "Доступ только для директора", Toast.LENGTH_SHORT).show();
                         }
-                    } else if (items[which].equals("Выход")) {
-                        getSharedPreferences("app", MODE_PRIVATE).edit().clear().apply();
-                        startActivity(new Intent(MainMenuActivity.this, LoginActivity.class));
-                        finish();
                     }
                 })
                 .show();

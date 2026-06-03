@@ -1,9 +1,11 @@
 package com.example.salestracker.fragments;
 
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Typeface;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Gravity;
@@ -11,16 +13,21 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.*;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
+import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import com.example.salestracker.ApiClient;
+import com.example.salestracker.CsvHelper;
 import com.example.salestracker.R;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import java.io.File;
 import java.util.*;
 
 public class ScheduleFragment extends Fragment {
@@ -43,11 +50,58 @@ public class ScheduleFragment extends Fragment {
     private List<MonthData> monthList = new ArrayList<>();
     private int currentPosition = 120;
 
+    // ActivityResultLauncher для экспорта и импорта
+    private ActivityResultLauncher<String> exportLauncher;
+    private ActivityResultLauncher<String[]> importLauncher;
+
     private final String[] monthNamesNominative = {"Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
             "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"};
 
     private final String[] monthNamesGenitive = {"января", "февраля", "марта", "апреля", "мая", "июня",
             "июля", "августа", "сентября", "октября", "ноября", "декабря"};
+
+    // Получить цвет для ячейки календаря по статусу
+    private int getStatusColor(String shiftTime) {
+        if (shiftTime == null) return 0xFFFFFFFF;
+        switch (shiftTime) {
+            case "09:00-18:00": return 0xFFC8E6C9;
+            case "10:00-19:00": return 0xFFC8E6C9;
+            case "12:00-21:00": return 0xFFC8E6C9;
+            case "Выходной": return 0xFFBBDEFB;
+            case "Отпуск": return 0xFFBB40AC;
+            case "Больничный": return 0xFFBB40AC;
+            case "Другой офис": return 0xFFFFF9C4;
+            default: return 0xFFFFFFFF;
+        }
+    }
+
+    private String getShortStatus(String shiftTime) {
+        if (shiftTime == null) return "";
+        switch (shiftTime) {
+            case "09:00-18:00": return "9-18";
+            case "10:00-19:00": return "10-19";
+            case "12:00-21:00": return "12-21";
+            case "Выходной": return "Вых";
+            case "Отпуск": return "Отп";
+            case "Больничный": return "Бол";
+            case "Другой офис": return "Др";
+            default: return "";
+        }
+    }
+
+    private String getDisplayText(String shiftTime) {
+        if (shiftTime == null) return "?";
+        switch (shiftTime) {
+            case "09:00-18:00": return "09:00-18:00";
+            case "10:00-19:00": return "10:00-19:00";
+            case "12:00-21:00": return "12:00-21:00";
+            case "Выходной": return "Выходной";
+            case "Отпуск": return "Отпуск";
+            case "Больничный": return "Больничный";
+            case "Другой офис": return "Другой офис";
+            default: return shiftTime;
+        }
+    }
 
     private static class MonthData {
         int year, month;
@@ -128,7 +182,7 @@ public class ScheduleFragment extends Fragment {
             tv.setGravity(Gravity.CENTER);
             tv.setTextSize(12);
             tv.setTypeface(Typeface.DEFAULT_BOLD);
-            int cellSizePx = (int) (38 * getResources().getDisplayMetrics().density);
+            int cellSizePx = (int) (45 * getResources().getDisplayMetrics().density);
             tv.setLayoutParams(new ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     cellSizePx
@@ -143,9 +197,44 @@ public class ScheduleFragment extends Fragment {
                 holder.textView.setText("");
                 holder.textView.setBackgroundColor(0xFFF5F5F5);
             } else {
-                holder.textView.setText(String.valueOf(dayNumber));
-                holder.textView.setTextColor(selectedDay == dayNumber ? 0xFFFFFFFF : 0xFF000000);
-                holder.textView.setBackgroundColor(selectedDay == dayNumber ? 0xFF2196F3 : 0xFFFFFFFF);
+                String key = currentYear + "-" + (currentMonth + 1) + "-" + dayNumber;
+                List<ShiftData> dayShifts = shifts.get(key);
+
+                String currentUserStatus = null;
+                if (dayShifts != null) {
+                    for (ShiftData data : dayShifts) {
+                        if (data.employee.equals(currentEmployee)) {
+                            currentUserStatus = data.shiftTime;
+                            break;
+                        }
+                    }
+                }
+
+                String cellText = String.valueOf(dayNumber);
+                String shortStatus = "";
+                if (currentUserStatus != null && !currentUserStatus.isEmpty()) {
+                    shortStatus = getShortStatus(currentUserStatus);
+                    if (!shortStatus.isEmpty()) {
+                        cellText = dayNumber + "\n" + shortStatus;
+                    }
+                }
+
+                holder.textView.setText(cellText);
+                holder.textView.setTextSize(currentUserStatus != null ? 10 : 12);
+
+                if (currentUserStatus != null && !currentUserStatus.isEmpty()) {
+                    holder.textView.setBackgroundColor(getStatusColor(currentUserStatus));
+                } else {
+                    holder.textView.setBackgroundColor(0xFFFFFFFF);
+                }
+
+                if (selectedDay == dayNumber) {
+                    holder.textView.setBackgroundColor(0xFF2196F3);
+                    holder.textView.setTextColor(0xFFFFFFFF);
+                } else {
+                    holder.textView.setTextColor(0xFF000000);
+                }
+
                 holder.textView.setOnClickListener(v -> {
                     selectedDay = dayNumber;
                     showDayInfo(selectedDay);
@@ -164,6 +253,24 @@ public class ScheduleFragment extends Fragment {
                 textView = (TextView) itemView;
             }
         }
+    }
+
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        // Инициализация лаунчеров для экспорта и импорта
+        exportLauncher = registerForActivityResult(new ActivityResultContracts.CreateDocument(), uri -> {
+            if (uri != null) {
+                exportToCsv(uri);
+            }
+        });
+
+        importLauncher = registerForActivityResult(new ActivityResultContracts.OpenDocument(), uri -> {
+            if (uri != null) {
+                Toast.makeText(getContext(), "Импорт пока в разработке", Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     @Override
@@ -192,6 +299,7 @@ public class ScheduleFragment extends Fragment {
         currentYear = cal.get(Calendar.YEAR);
         currentMonth = cal.get(Calendar.MONTH);
 
+        // Генерируем список месяцев для свайпа
         for (int i = -120; i <= 120; i++) {
             int y = currentYear + (i / 12);
             int m = currentMonth + i;
@@ -396,6 +504,7 @@ public class ScheduleFragment extends Fragment {
                         shifts.put(key, currentShifts);
                         saveToServer(day, employee, time);
                         showDayInfo(selectedDay);
+                        updateCalendar();
                         Toast.makeText(getContext(), "Сотрудник добавлен", Toast.LENGTH_SHORT).show();
                     } else {
                         Toast.makeText(getContext(), "Сотрудник уже есть в этот день", Toast.LENGTH_SHORT).show();
@@ -466,10 +575,10 @@ public class ScheduleFragment extends Fragment {
                     }
                     shifts.put(key, currentShifts);
                     showDayInfo(selectedDay);
+                    updateCalendar();
                     Toast.makeText(getContext(), "Смена сохранена", Toast.LENGTH_SHORT).show();
                 })
                 .setNeutralButton("Удалить", (dialog, which) -> {
-                    // Удаляем локально
                     String key = currentYear + "-" + (currentMonth + 1) + "-" + day;
                     List<ShiftData> currentShifts = shifts.get(key);
                     if (currentShifts != null) {
@@ -481,8 +590,8 @@ public class ScheduleFragment extends Fragment {
                         }
                     }
                     showDayInfo(selectedDay);
+                    updateCalendar();
                     Toast.makeText(getContext(), "Сотрудник удален", Toast.LENGTH_SHORT).show();
-                    // Отправляем запрос на сервер
                     saveToServer(day, employee, "");
                 })
                 .setNegativeButton("Отмена", null)
@@ -579,32 +688,33 @@ public class ScheduleFragment extends Fragment {
         tvUpdateTime.setText("Обновлено: " + new java.text.SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(new java.util.Date()));
     }
 
-    private int getStatusColor(String shiftTime) {
-        if (shiftTime == null) return 0xFF999999;
-        switch (shiftTime) {
-            case "09:00-18:00": return 0xFF4CAF50;
-            case "10:00-19:00": return 0xFF4CAF50;
-            case "12:00-21:00": return 0xFF4CAF50;
-            case "Выходной": return 0xFFF44336;
-            case "Отпуск": return 0xFFFF9800;
-            case "Больничный": return 0xFF9E9E9E;
-            case "Другой офис": return 0xFF2196F3;
-            default: return 0xFF999999;
+    // ==================== ПУБЛИЧНЫЕ МЕТОДЫ ДЛЯ ВЫЗОВА ИЗ МЕНЮ ====================
+
+    public void refreshData() {
+        if (getContext() != null) {
+            loadFromServer();
+            Toast.makeText(getContext(), "Данные обновлены", Toast.LENGTH_SHORT).show();
         }
     }
 
-    private String getDisplayText(String shiftTime) {
-        if (shiftTime == null) return "?";
-        switch (shiftTime) {
-            case "09:00-18:00": return "09:00-18:00";
-            case "10:00-19:00": return "10:00-19:00";
-            case "12:00-21:00": return "12:00-21:00";
-            case "Выходной": return "Выходной";
-            case "Отпуск": return "Отпуск";
-            case "Больничный": return "Больничный";
-            case "Другой офис": return "Другой офис";
-            default: return shiftTime;
+    // Экспорт в CSV и сразу отправка на почту
+    public void exportToExcel() {
+        exportLauncher.launch("schedules_" + currentYear + "_" + (currentMonth + 1) + ".csv");
+    }
+
+    private void exportToCsv(Uri uri) {
+        try {
+            File cacheFile = new File(requireContext().getCacheDir(), "schedules_" + currentYear + "_" + (currentMonth + 1) + ".csv");
+            CsvHelper csvHelper = new CsvHelper(getContext());
+            csvHelper.exportToCsvToFile(currentYear, currentMonth + 1, shifts, employees, cacheFile);
+            sendEmailWithCsv(uri);
+        } catch (Exception e) {
+            Toast.makeText(getContext(), "Ошибка: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
+    }
+
+    public void importFromExcel() {
+        importLauncher.launch(new String[]{"text/csv", "application/vnd.ms-excel"});
     }
 
     public void showEditDialog() {
@@ -618,25 +728,32 @@ public class ScheduleFragment extends Fragment {
         showAddEmployeeDialog(selectedDay);
     }
 
-    public void refreshData() {
-        if (getContext() != null) {
-            loadFromServer();
-            Toast.makeText(getContext(), "Данные обновлены", Toast.LENGTH_SHORT).show();
-        }
+    // Отправка CSV на почту
+    private void sendEmailWithCsv(Uri uri) {
+        Intent emailIntent = new Intent(Intent.ACTION_SEND);
+        emailIntent.setType("text/csv");
+        emailIntent.putExtra(Intent.EXTRA_STREAM, uri);
+        emailIntent.putExtra(Intent.EXTRA_EMAIL, new String[]{"eVieq@yandex.ru"});
+        emailIntent.putExtra(Intent.EXTRA_SUBJECT, "Экспорт смен за " + monthNamesNominative[currentMonth] + " " + currentYear);
+        emailIntent.putExtra(Intent.EXTRA_TEXT, "Файл с графиком смен прилагается.");
+        emailIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+        startActivity(Intent.createChooser(emailIntent, "Отправить email"));
     }
 
-    static class ShiftData {
-        String employee, shiftTime;
-        ShiftData(String employee, String shiftTime) {
+    // Публичные статические классы для доступа из CsvHelper
+    public static class ShiftData {
+        public String employee, shiftTime;
+        public ShiftData(String employee, String shiftTime) {
             this.employee = employee;
             this.shiftTime = shiftTime;
         }
     }
 
-    static class Employee {
-        int id;
-        String name, role;
-        Employee(int id, String name, String role) {
+    public static class Employee {
+        public int id;
+        public String name, role;
+        public Employee(int id, String name, String role) {
             this.id = id;
             this.name = name;
             this.role = role;
