@@ -64,12 +64,13 @@ public class EditDayScheduleDialog extends Dialog {
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
+                    Toast.makeText(context, "Ошибка загрузки сотрудников", Toast.LENGTH_SHORT).show();
                 }
             }
 
             @Override
             public void onError(String error) {
-                Toast.makeText(context, "Ошибка загрузки сотрудников", Toast.LENGTH_SHORT).show();
+                Toast.makeText(context, "Ошибка загрузки сотрудников: " + error, Toast.LENGTH_SHORT).show();
             }
         });
     }
@@ -103,12 +104,13 @@ public class EditDayScheduleDialog extends Dialog {
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
+                    Toast.makeText(context, "Ошибка загрузки графика", Toast.LENGTH_SHORT).show();
                 }
             }
 
             @Override
             public void onError(String error) {
-                Toast.makeText(context, "Ошибка загрузки: " + error, Toast.LENGTH_SHORT).show();
+                Toast.makeText(context, "Ошибка: " + error, Toast.LENGTH_SHORT).show();
             }
         });
     }
@@ -186,7 +188,10 @@ public class EditDayScheduleDialog extends Dialog {
         Spinner spinnerTime = view.findViewById(R.id.spinnerTime);
         spinnerTime.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, times));
 
-        view.findViewById(R.id.spinnerEmployee).setVisibility(View.GONE);
+        TextView tvEmployeeLabel = view.findViewById(R.id.tvEmployeeLabel);
+        Spinner spinnerEmployee = view.findViewById(R.id.spinnerEmployee);
+        tvEmployeeLabel.setVisibility(View.GONE);
+        spinnerEmployee.setVisibility(View.GONE);
 
         for (int i = 0; i < times.length; i++) {
             if (times[i].equals(oldShiftTime)) {
@@ -217,6 +222,8 @@ public class EditDayScheduleDialog extends Dialog {
                 .show();
     }
 
+    // ==================== ADAPTER ====================
+
     private class ShiftAdapter extends RecyclerView.Adapter<ShiftAdapter.ViewHolder> {
         @Override
         public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
@@ -235,7 +242,9 @@ public class EditDayScheduleDialog extends Dialog {
         }
 
         @Override
-        public int getItemCount() { return shifts.size(); }
+        public int getItemCount() {
+            return shifts.size();
+        }
 
         class ViewHolder extends RecyclerView.ViewHolder {
             TextView tvEmployee, tvShiftTime;
@@ -249,6 +258,8 @@ public class EditDayScheduleDialog extends Dialog {
             }
         }
     }
+
+    // ==================== DATA CLASSES ====================
 
     static class EmployeeShift {
         String employee, shiftTime;

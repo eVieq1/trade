@@ -17,7 +17,7 @@
             android:id="@+id/tvToolbarTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Продажи"
+            android:text="Графики"
             android:textSize="18sp"
             android:textColor="#FFFFFF"
             android:layout_gravity="start"

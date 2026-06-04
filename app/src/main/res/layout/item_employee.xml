@@ -3,27 +3,30 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="horizontal"
-    android:padding="12dp"
+    android:padding="16dp"
     android:background="#FFFFFF"
     android:layout_marginBottom="4dp"
-    android:elevation="2dp">
+    android:elevation="2dp"
+    android:clickable="true"
+    android:focusable="true">
 
     <LinearLayout
         android:layout_width="0dp"
-        android:layout_weight="1"
+        android:layout_weight="2"
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
         <TextView
-            android:id="@+id/tvEmployee"
+            android:id="@+id/tvEmployeeName"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textSize="14sp"
+            android:textSize="16sp"
             android:textStyle="bold"
-            android:textColor="#333333" />
+            android:textColor="#333333"
+            android:clickable="true" />
 
         <TextView
-            android:id="@+id/tvShiftTime"
+            android:id="@+id/tvEmployeeRole"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:textSize="12sp"
@@ -32,18 +35,16 @@
 
     </LinearLayout>
 
-    <ImageButton
-        android:id="@+id/btnEdit"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:src="@android:drawable/ic_menu_edit"
-        android:background="?android:attr/selectableItemBackgroundBorderless" />
-
-    <ImageButton
-        android:id="@+id/btnDelete"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:src="@android:drawable/ic_menu_close_clear_cancel"
-        android:background="?android:attr/selectableItemBackgroundBorderless" />
+    <TextView
+        android:id="@+id/tvEmployeeOffice"
+        android:layout_width="0dp"
+        android:layout_weight="1"
+        android:layout_height="wrap_content"
+        android:textSize="12sp"
+        android:textColor="#2196F3"
+        android:gravity="end"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:clickable="true" />
 
 </LinearLayout>

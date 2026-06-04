@@ -12,6 +12,14 @@
         android:background="#2196F3"
         android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar" />
 
+    <!-- Горизонтальный RecyclerView для выбора месяца (скролл влево-вправо) -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/monthRecyclerView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="8dp"
+        android:scrollbars="horizontal" />
+
     <TextView
         android:id="@+id/tvMonthYear"
         android:layout_width="wrap_content"

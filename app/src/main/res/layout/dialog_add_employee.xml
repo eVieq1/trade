@@ -3,31 +3,30 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="24dp">
 
-    <TextView
-        android:id="@+id/tvEmployeeLabel"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Сотрудник:"
-        android:textSize="14sp"
-        android:layout_marginBottom="8dp" />
-
-    <Spinner
-        android:id="@+id/spinnerEmployee"
+    <EditText
+        android:id="@+id/etName"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="16dp"/>
+        android:hint="Имя сотрудника"
+        android:inputType="textPersonName"
+        android:padding="12dp"
+        android:layout_marginBottom="16dp"
+        android:background="@android:drawable/editbox_background"
+        android:maxLength="12"
+        android:singleLine="true" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Время:"
+        android:text="Роль:"
         android:textSize="14sp"
+        android:textColor="#333333"
         android:layout_marginBottom="8dp" />
 
     <Spinner
-        android:id="@+id/spinnerTime"
+        android:id="@+id/spinnerRole"
         android:layout_width="match_parent"
         android:layout_height="wrap_content" />
 

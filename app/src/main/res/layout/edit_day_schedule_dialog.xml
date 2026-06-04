@@ -11,6 +11,7 @@
         android:layout_height="48dp"
         android:text="+ Добавить сотрудника"
         android:backgroundTint="#2196F3"
+        android:textColor="#FFFFFF"
         android:layout_marginBottom="16dp" />
 
     <androidx.recyclerview.widget.RecyclerView
