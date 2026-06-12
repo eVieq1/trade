@@ -1,20 +1,23 @@
 package com.example.salestracker.fragments;
 
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.cardview.widget.CardView;
 import androidx.fragment.app.Fragment;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.example.salestracker.ApiClient;
 import com.example.salestracker.R;
-import com.example.salestracker.databinding.FragmentRatingBinding;
 import com.example.salestracker.utils.NetworkUtils;
 
 import org.json.JSONArray;
@@ -24,38 +27,55 @@ import java.util.Calendar;
 
 public class RatingFragment extends Fragment {
 
-    private FragmentRatingBinding binding;
+    private SwipeRefreshLayout swipeRefresh;
+    private LinearLayout containerRating;
+    private ProgressBar progressBar;
+    private TextView tvEmptyState;
     private ApiClient apiClient;
 
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-        binding = FragmentRatingBinding.inflate(inflater, container, false);
-        return binding.getRoot();
-    }
+    public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+        View view = inflater.inflate(R.layout.fragment_rating, container, false);
 
-    @Override
-    public void onViewCreated(@NonNull View view, Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
+        swipeRefresh = view.findViewById(R.id.swipeRefresh);
+        containerRating = view.findViewById(R.id.containerRating);
+        progressBar = view.findViewById(R.id.progressBar);
+        tvEmptyState = view.findViewById(R.id.tvEmptyState);
 
         apiClient = new ApiClient();
 
-        binding.swipeRefresh.setOnRefreshListener(() -> {
-            loadRating();
-        });
+        swipeRefresh.setOnRefreshListener(() -> refreshData());
 
-        if (NetworkUtils.isNetworkAvailable(requireContext())) {
+        loadRating();
+
+        return view;
+    }
+
+    public void refreshData() {
+        if (getContext() != null && isAdded()) {
             loadRating();
-        } else {
-            NetworkUtils.showNoInternetMessage(requireContext());
-            showEmptyState("Нет подключения к интернету");
+            Toast.makeText(getContext(), "Данные обновлены", Toast.LENGTH_SHORT).show();
         }
     }
 
     private void loadRating() {
-        binding.progressBar.setVisibility(View.VISIBLE);
-        binding.containerRating.setVisibility(View.GONE);
-        binding.tvEmptyState.setVisibility(View.GONE);
-        binding.swipeRefresh.setRefreshing(false);
+        progressBar.setVisibility(View.VISIBLE);
+        containerRating.setVisibility(View.GONE);
+        tvEmptyState.setVisibility(View.GONE);
+
+        if (swipeRefresh != null) {
+            swipeRefresh.setRefreshing(false);
+        }
+
+        if (!NetworkUtils.isNetworkAvailable(getContext())) {
+            progressBar.setVisibility(View.GONE);
+            showEmptyState("Нет подключения к интернету");
+            NetworkUtils.showNoInternetMessage(getContext());
+            return;
+        }
+
+        SharedPreferences prefs = requireActivity().getSharedPreferences("app", Context.MODE_PRIVATE);
+        int officeId = prefs.getInt("office_id", 0);
 
         Calendar cal = Calendar.getInstance();
         int year = cal.get(Calendar.YEAR);
@@ -64,7 +84,7 @@ public class RatingFragment extends Fragment {
         apiClient.getRating(year, month, new ApiClient.ApiCallback() {
             @Override
             public void onSuccess(String response) {
-                binding.progressBar.setVisibility(View.GONE);
+                progressBar.setVisibility(View.GONE);
 
                 try {
                     JSONObject obj = new JSONObject(response);
@@ -84,7 +104,7 @@ public class RatingFragment extends Fragment {
 
             @Override
             public void onError(String error) {
-                binding.progressBar.setVisibility(View.GONE);
+                progressBar.setVisibility(View.GONE);
                 showEmptyState("Ошибка соединения: " + error);
                 Toast.makeText(getContext(), "Ошибка загрузки рейтинга", Toast.LENGTH_SHORT).show();
             }
@@ -92,8 +112,8 @@ public class RatingFragment extends Fragment {
     }
 
     private void displayRating(JSONArray ratingArray) throws Exception {
-        binding.containerRating.removeAllViews();
-        binding.containerRating.setVisibility(View.VISIBLE);
+        containerRating.removeAllViews();
+        containerRating.setVisibility(View.VISIBLE);
 
         if (ratingArray.length() == 0) {
             showEmptyState("Нет данных о продажах за текущий месяц");
@@ -114,14 +134,14 @@ public class RatingFragment extends Fragment {
                     LinearLayout.LayoutParams.WRAP_CONTENT);
             params.setMargins(16, 8, 16, 8);
             card.setLayoutParams(params);
-            binding.containerRating.addView(card);
+            containerRating.addView(card);
         }
     }
 
     private void showEmptyState(String message) {
-        binding.containerRating.setVisibility(View.GONE);
-        binding.tvEmptyState.setVisibility(View.VISIBLE);
-        binding.tvEmptyState.setText(message);
+        containerRating.setVisibility(View.GONE);
+        tvEmptyState.setVisibility(View.VISIBLE);
+        tvEmptyState.setText(message);
     }
 
     private CardView createRatingCard(int place, String name, int percent, double sales, String medal) {
@@ -135,10 +155,10 @@ public class RatingFragment extends Fragment {
         content.setPadding(16, 16, 16, 16);
 
         TextView tvPlace = new TextView(getContext());
-        tvPlace.setText(String.valueOf(place));
+        tvPlace.setText(place + " " + medal);
         tvPlace.setTextSize(18);
         tvPlace.setTypeface(null, android.graphics.Typeface.BOLD);
-        tvPlace.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.5f));
+        tvPlace.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.8f));
 
         TextView tvName = new TextView(getContext());
         tvName.setText(name);
@@ -162,15 +182,9 @@ public class RatingFragment extends Fragment {
         tvSales.setTextColor(0xFF666666);
         percentLayout.addView(tvSales);
 
-        TextView tvMedal = new TextView(getContext());
-        tvMedal.setText(medal);
-        tvMedal.setTextSize(20);
-        tvMedal.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.5f));
-
         content.addView(tvPlace);
         content.addView(tvName);
         content.addView(percentLayout);
-        content.addView(tvMedal);
 
         card.addView(content);
         return card;
@@ -182,6 +196,5 @@ public class RatingFragment extends Fragment {
         if (apiClient != null) {
             apiClient.shutdown();
         }
-        binding = null;
     }
 }

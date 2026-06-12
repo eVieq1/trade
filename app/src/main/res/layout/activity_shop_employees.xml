@@ -16,8 +16,19 @@
         android:id="@+id/btnAddEmployee"
         android:layout_width="match_parent"
         android:layout_height="48dp"
-        android:text="+ Добавить сотрудника"
+        android:text="+ ДОБАВИТЬ СОТРУДНИКА"
         android:backgroundTint="#2196F3"
+        android:textColor="#FFFFFF"
+        android:textSize="14sp"
+        android:layout_margin="16dp"
+        android:visibility="gone" />
+
+    <Button
+        android:id="@+id/btnEditPlans"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:text="📊 ИЗМЕНИТЬ ПЛАНЫ"
+        android:backgroundTint="#FF9800"
         android:textColor="#FFFFFF"
         android:textSize="14sp"
         android:layout_margin="16dp"

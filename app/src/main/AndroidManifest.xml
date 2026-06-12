@@ -28,13 +28,43 @@
             </intent-filter>
         </activity>
 
-        <!-- Главное меню -->
+        <!-- Главное меню (дашборд) -->
         <activity
             android:name=".MainMenuActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
 
-        <!-- Настройка планов / графика -->
+        <!-- Продажи -->
+        <activity
+            android:name=".SalesActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <!-- Продажи за месяц -->
+        <activity
+            android:name=".MonthlySalesActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <!-- Графики -->
+        <activity
+            android:name=".ScheduleActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <!-- Отчёты -->
+        <activity
+            android:name=".ReportsActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <!-- Рейтинг -->
+        <activity
+            android:name=".RatingActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <!-- Планы продаж -->
         <activity
             android:name=".PlanSettingsActivity"
             android:exported="false"
@@ -61,6 +91,26 @@
         <!-- Редактирование продаж -->
         <activity
             android:name=".EditSalesActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <!-- Аналитика трафика -->
+        <activity
+            android:name=".TrafficAnalyticsActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <!-- Профиль сотрудника -->
+        <activity
+            android:name=".EmployeeDetailActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <!-- ========== НОВАЯ АКТИВНОСТЬ ========== -->
+
+        <!-- Планы (Офис / Сотрудник / Вызов принят) -->
+        <activity
+            android:name=".PlanActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
 

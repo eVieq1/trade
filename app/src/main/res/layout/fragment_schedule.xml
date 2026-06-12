@@ -5,7 +5,6 @@
     android:orientation="vertical"
     android:background="#F5F5F5">
 
-    <!-- RecyclerView с месяцами - ТОЛЬКО ГОРИЗОНТАЛЬНЫЙ СКРОЛЛ -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/monthRecyclerView"
         android:layout_width="match_parent"
@@ -14,7 +13,6 @@
         android:scrollbars="horizontal"
         android:nestedScrollingEnabled="false" />
 
-    <!-- ДНИ НЕДЕЛИ -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="28dp"
@@ -32,7 +30,6 @@
         <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:text="ВС" android:gravity="center" android:textStyle="bold" android:textColor="#333333" android:background="#E0E0E0" android:textSize="11sp"/>
     </LinearLayout>
 
-    <!-- КАЛЕНДАРЬ -->
     <GridView
         android:id="@+id/gridSchedule"
         android:layout_width="match_parent"
@@ -44,7 +41,6 @@
         android:stretchMode="columnWidth"
         android:verticalSpacing="1dp" />
 
-    <!-- ВЫБРАННАЯ ДАТА -->
     <TextView
         android:id="@+id/tvSelectedDate"
         android:layout_width="match_parent"
@@ -58,7 +54,6 @@
         android:paddingTop="4dp"
         android:paddingBottom="4dp" />
 
-    <!-- КНОПКА РЕДАКТИРОВАНИЯ -->
     <Button
         android:id="@+id/btnEditShift"
         android:layout_width="match_parent"
@@ -71,7 +66,6 @@
         android:layout_margin="8dp"
         android:visibility="gone" />
 
-    <!-- ScrollView ТОЛЬКО ДЛЯ СПИСКА СОТРУДНИКОВ -->
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -86,7 +80,6 @@
 
     </ScrollView>
 
-    <!-- ВРЕМЯ ОБНОВЛЕНИЯ -->
     <TextView
         android:id="@+id/tvUpdateTime"
         android:layout_width="wrap_content"

@@ -11,12 +11,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ArrayAdapter;
-import android.widget.EditText;
-import android.widget.Spinner;
-import android.widget.TextView;
-import android.widget.Toast;
-
+import android.widget.*;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.ItemTouchHelper;
@@ -45,6 +40,10 @@ public class EmployeesActivity extends AppCompatActivity {
     private ApiClient apiClient;
     private String currentUserRole;
     private int currentUserOfficeId = 0;
+    private boolean canEdit;
+    private boolean isGlobalAdmin;
+    private int selectedOfficeId = 0;
+    private String currentOfficeName;
 
     private final String[] roles = {"owner", "rgo", "dm", "senior_seller", "seller", "bot"};
     private final String[] roleDisplayNames = {"Владелец", "РГО", "Директор", "Старший специалист", "Специалист", "Бот"};
@@ -69,32 +68,92 @@ public class EmployeesActivity extends AppCompatActivity {
         SharedPreferences prefs = getSharedPreferences("app", MODE_PRIVATE);
         currentUserRole = prefs.getString("user_role", "seller");
         currentUserOfficeId = prefs.getInt("office_id", 0);
+        currentOfficeName = prefs.getString("office_name", "Мой офис");
+        selectedOfficeId = currentUserOfficeId;
 
+        canEdit = currentUserRole.equals("owner") || currentUserRole.equals("rgo") || currentUserRole.equals("dm");
+        isGlobalAdmin = currentUserRole.equals("owner") || currentUserRole.equals("rgo");
+
+        setupUI();
+        loadShops();
         setupSwipeToDelete();
+    }
 
-        boolean canAdd = currentUserRole.equals("owner") || currentUserRole.equals("rgo") || currentUserRole.equals("dm");
-        if (canAdd) {
+    private void setupSwipeToDelete() {
+        // Только для глобальных администраторов (owner/rgo)
+        if (isGlobalAdmin) {
+            ItemTouchHelper.SimpleCallback swipeCallback = new ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT) {
+                @Override
+                public boolean onMove(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder, @NonNull RecyclerView.ViewHolder target) {
+                    return false;
+                }
+
+                @Override
+                public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
+                    int position = viewHolder.getAdapterPosition();
+                    if (position < 0 || position >= employeeList.size()) {
+                        adapter.notifyDataSetChanged();
+                        return;
+                    }
+
+                    Employee employee = employeeList.get(position);
+
+                    new AlertDialog.Builder(EmployeesActivity.this)
+                            .setTitle("Удалить сотрудника")
+                            .setMessage("Вы уверены, что хотите удалить " + employee.name + "?")
+                            .setPositiveButton("Удалить", (dialog, which) -> deleteEmployee(employee.id, position))
+                            .setNegativeButton("Отмена", (dialog, which) -> adapter.notifyItemChanged(position))
+                            .show();
+                }
+            };
+            new ItemTouchHelper(swipeCallback).attachToRecyclerView(binding.recyclerViewEmployees);
+        }
+    }
+
+    private void setupUI() {
+        if (isGlobalAdmin) {
+            // Для РГО и Владельца: показываем спиннер выбора офиса
+            binding.officeHeader.setVisibility(View.VISIBLE);
+            binding.tvEmployeesCount.setVisibility(View.VISIBLE);
+            binding.btnAddEmployeeQuick.setVisibility(View.GONE);
+            binding.btnAddOfficeQuick.setVisibility(View.GONE);
+            binding.btnAddEmployee.setVisibility(View.GONE);
+        } else if (currentUserRole.equals("dm")) {
+            binding.officeHeader.setVisibility(View.VISIBLE);
+            binding.tvEmployeesCount.setVisibility(View.VISIBLE);
+            binding.spinnerOffice.setVisibility(View.GONE);
+            binding.btnAddEmployeeQuick.setVisibility(View.GONE);
+            binding.btnAddOfficeQuick.setVisibility(View.GONE);
+
             binding.btnAddEmployee.setVisibility(View.VISIBLE);
             binding.btnAddEmployee.setOnClickListener(v -> showAddEmployeeDialog());
-        } else {
-            binding.btnAddEmployee.setVisibility(View.GONE);
-        }
 
-        if (NetworkUtils.isNetworkAvailable(this)) {
-            loadShops();
-            loadEmployees();
+            TextView tvOfficeTitle = new TextView(this);
+            tvOfficeTitle.setText("🏢 " + currentOfficeName);
+            tvOfficeTitle.setTextSize(16);
+            tvOfficeTitle.setTextColor(0xFF333333);
+            tvOfficeTitle.setPadding(0, 0, 16, 0);
+            ((LinearLayout) binding.officeHeader).addView(tvOfficeTitle, 1);
         } else {
-            NetworkUtils.showNoInternetMessage(this);
+            binding.officeHeader.setVisibility(View.GONE);
+            binding.tvEmployeesCount.setVisibility(View.GONE);
+            binding.btnAddEmployee.setVisibility(View.GONE);
         }
     }
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        if (currentUserRole.equals("owner") || currentUserRole.equals("rgo")) {
-            menu.add(0, 1, 0, "Офисы");
-            menu.add(0, 2, 1, "Выход");
+        if (isGlobalAdmin) {
+            // Сначала ОФИСЫ, потом СОТРУДНИКИ
+            menu.add(0, 4, 0, "🏢 Офисы");
+            menu.add(0, 1, 1, "➕ Добавить сотрудника");
+            menu.add(0, 2, 2, "➕ Добавить офис");
+            menu.add(0, 3, 3, "🚪 Выход");
+        } else if (currentUserRole.equals("dm")) {
+            menu.add(0, 1, 0, "➕ Добавить сотрудника");
+            menu.add(0, 3, 1, "🚪 Выход");
         } else {
-            menu.add(0, 2, 0, "Выход");
+            menu.add(0, 3, 0, "🚪 Выход");
         }
         return true;
     }
@@ -102,61 +161,23 @@ public class EmployeesActivity extends AppCompatActivity {
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         int id = item.getItemId();
-        if (id == 1) {
+        if (id == 4 && isGlobalAdmin) {
             startActivity(new Intent(EmployeesActivity.this, ShopsActivity.class));
             return true;
-        } else if (id == 2) {
+        } else if (id == 1 && isGlobalAdmin) {
+            showAddEmployeeDialog();
+            return true;
+        } else if (id == 2 && isGlobalAdmin) {
+            showAddOfficeDialog();
+            return true;
+        } else if (id == 1 && currentUserRole.equals("dm")) {
+            showAddEmployeeDialog();
+            return true;
+        } else if (id == 3) {
             finishAffinity();
             return true;
         }
         return super.onOptionsItemSelected(item);
-    }
-
-    private void setupSwipeToDelete() {
-        ItemTouchHelper.SimpleCallback swipeCallback = new ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT) {
-            @Override
-            public boolean onMove(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder, @NonNull RecyclerView.ViewHolder target) {
-                return false;
-            }
-
-            @Override
-            public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
-                int position = viewHolder.getAdapterPosition();
-                if (position < 0 || position >= employeeList.size()) {
-                    adapter.notifyDataSetChanged();
-                    return;
-                }
-
-                Employee employee = employeeList.get(position);
-
-                // ИСПРАВЛЕННАЯ ПРОВЕРКА ПРАВ НА УДАЛЕНИЕ
-                boolean canDelete = false;
-                if (currentUserRole.equals("owner") || currentUserRole.equals("rgo")) {
-                    canDelete = true;
-                } else if (currentUserRole.equals("dm")) {
-                    // DM может удалять только сотрудников своего офиса
-                    if (employee.officeId == currentUserOfficeId &&
-                            !employee.role.equals("owner") &&
-                            !employee.role.equals("rgo")) {
-                        canDelete = true;
-                    }
-                }
-
-                if (!canDelete) {
-                    Toast.makeText(EmployeesActivity.this, "У вас нет прав на удаление этого сотрудника", Toast.LENGTH_SHORT).show();
-                    adapter.notifyItemChanged(position);
-                    return;
-                }
-
-                new AlertDialog.Builder(EmployeesActivity.this)
-                        .setTitle("Удалить сотрудника")
-                        .setMessage("Вы уверены, что хотите удалить " + employee.name + "?")
-                        .setPositiveButton("Удалить", (dialog, which) -> deleteEmployee(employee.id, position))
-                        .setNegativeButton("Отмена", (dialog, which) -> adapter.notifyItemChanged(position))
-                        .show();
-            }
-        };
-        new ItemTouchHelper(swipeCallback).attachToRecyclerView(binding.recyclerViewEmployees);
     }
 
     private void loadShops() {
@@ -171,7 +192,12 @@ public class EmployeesActivity extends AppCompatActivity {
                         JSONObject shop = arr.getJSONObject(i);
                         shopList.add(new Shop(shop.getInt("id"), shop.getString("name")));
                     }
-                    adapter.notifyDataSetChanged();
+
+                    if (isGlobalAdmin && !shopList.isEmpty()) {
+                        setupOfficeSpinner();
+                    }
+
+                    loadEmployees();
                 } catch (Exception e) {
                     Log.e("EmployeesActivity", "Ошибка загрузки офисов: " + e.getMessage());
                 }
@@ -182,6 +208,40 @@ public class EmployeesActivity extends AppCompatActivity {
                 Log.e("EmployeesActivity", "Ошибка: " + error);
                 Toast.makeText(EmployeesActivity.this, "Ошибка загрузки офисов", Toast.LENGTH_SHORT).show();
             }
+        });
+    }
+
+    private void setupOfficeSpinner() {
+        List<String> officeNames = new ArrayList<>();
+        List<Integer> officeIds = new ArrayList<>();
+
+        officeNames.add("Все офисы");
+        officeIds.add(0);
+
+        for (Shop shop : shopList) {
+            officeNames.add(shop.name);
+            officeIds.add(shop.id);
+        }
+
+        ArrayAdapter<String> spinnerAdapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_dropdown_item, officeNames);
+        binding.spinnerOffice.setAdapter(spinnerAdapter);
+
+        for (int i = 0; i < officeIds.size(); i++) {
+            if (officeIds.get(i) == currentUserOfficeId) {
+                binding.spinnerOffice.setSelection(i);
+                break;
+            }
+        }
+
+        binding.spinnerOffice.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                selectedOfficeId = officeIds.get(position);
+                loadEmployees();
+            }
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
         });
     }
 
@@ -201,22 +261,20 @@ public class EmployeesActivity extends AppCompatActivity {
                         String name = emp.getString("name");
                         int id = emp.getInt("id");
 
-                        // ИСПРАВЛЕННАЯ ФИЛЬТРАЦИЯ ДЛЯ DM
-                        if (currentUserRole.equals("dm")) {
-                            // DM видит сотрудников своего офиса И непривязанных (officeId == 0)
-                            if (officeId == currentUserOfficeId || officeId == 0) {
-                                employeeList.add(new Employee(id, name, role, officeId));
-                            }
-                        } else {
-                            // Для owner и rgo показываем всех
-                            employeeList.add(new Employee(id, name, role, officeId));
+                        if (isGlobalAdmin && selectedOfficeId > 0 && officeId != selectedOfficeId) {
+                            continue;
                         }
+                        if (currentUserRole.equals("dm") && officeId != currentUserOfficeId && officeId != 0) {
+                            continue;
+                        }
+
+                        employeeList.add(new Employee(id, name, role, officeId));
                     }
 
                     adapter.notifyDataSetChanged();
 
-                    if (employeeList.isEmpty()) {
-                        Toast.makeText(EmployeesActivity.this, "Список сотрудников пуст", Toast.LENGTH_SHORT).show();
+                    if (binding.tvEmployeesCount.getVisibility() == View.VISIBLE) {
+                        binding.tvEmployeesCount.setText("Всего сотрудников: " + employeeList.size());
                     }
 
                 } catch (Exception e) {
@@ -233,20 +291,110 @@ public class EmployeesActivity extends AppCompatActivity {
         });
     }
 
+    private void showAddOfficeDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(48, 32, 48, 24);
+
+        EditText etName = new EditText(this);
+        etName.setHint("Название офиса");
+        etName.setPadding(16, 16, 16, 16);
+        layout.addView(etName);
+
+        EditText etAddress = new EditText(this);
+        etAddress.setHint("Адрес");
+        etAddress.setPadding(16, 16, 16, 16);
+        layout.addView(etAddress);
+
+        builder.setTitle("Добавить офис")
+                .setView(layout)
+                .setPositiveButton("Добавить", (dialog, which) -> {
+                    String name = etName.getText().toString().trim();
+                    String address = etAddress.getText().toString().trim();
+                    if (!name.isEmpty()) {
+                        addShop(name, address);
+                    }
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
+    }
+
+    private void addShop(String name, String address) {
+        ProgressDialog progress = new ProgressDialog(this);
+        progress.setMessage("Добавление...");
+        progress.show();
+
+        new Thread(() -> {
+            try {
+                JSONObject json = new JSONObject();
+                json.put("name", name);
+                json.put("address", address);
+
+                URL url = new URL(ApiClient.BASE_URL + "add_shop.php");
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json");
+                conn.setDoOutput(true);
+                conn.setConnectTimeout(15000);
+                conn.setReadTimeout(15000);
+
+                OutputStream os = conn.getOutputStream();
+                os.write(json.toString().getBytes("UTF-8"));
+                os.close();
+
+                int responseCode = conn.getResponseCode();
+                runOnUiThread(() -> {
+                    progress.dismiss();
+                    if (responseCode == 200) {
+                        Toast.makeText(EmployeesActivity.this, "Офис добавлен", Toast.LENGTH_SHORT).show();
+                        loadShops();
+                    } else {
+                        Toast.makeText(EmployeesActivity.this, "Ошибка сервера: " + responseCode, Toast.LENGTH_SHORT).show();
+                    }
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    progress.dismiss();
+                    Toast.makeText(EmployeesActivity.this, "Ошибка: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                });
+            }
+        }).start();
+    }
+
     private void showAddEmployeeDialog() {
-        View view = LayoutInflater.from(this).inflate(R.layout.dialog_add_employee, null);
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
 
-        EditText etName = view.findViewById(R.id.etName);
-        Spinner spinnerRole = view.findViewById(R.id.spinnerRole);
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(48, 32, 48, 24);
 
-        String[] roleOptions = {"Специалист", "Старший специалист"};
+        EditText etName = new EditText(this);
+        etName.setHint("Имя сотрудника");
+        etName.setPadding(16, 16, 16, 16);
+        layout.addView(etName);
+
+        TextView tvRoleLabel = new TextView(this);
+        tvRoleLabel.setText("Роль:");
+        tvRoleLabel.setPadding(0, 16, 0, 8);
+        layout.addView(tvRoleLabel);
+
+        Spinner spinnerRole = new Spinner(this);
+
+        String[] roleOptions;
+        if (isGlobalAdmin) {
+            roleOptions = roleDisplayNames;
+        } else {
+            roleOptions = new String[]{"Специалист", "Старший специалист"};
+        }
+
         ArrayAdapter<String> roleAdapter = new ArrayAdapter<>(this,
                 android.R.layout.simple_spinner_dropdown_item, roleOptions);
         spinnerRole.setAdapter(roleAdapter);
+        layout.addView(spinnerRole);
 
-        new AlertDialog.Builder(this)
-                .setTitle("Добавить сотрудника")
-                .setView(view)
+        builder.setTitle("Добавить сотрудника")
+                .setView(layout)
                 .setPositiveButton("Добавить", (dialog, which) -> {
                     String name = etName.getText().toString().trim();
                     if (name.isEmpty()) {
@@ -254,7 +402,12 @@ public class EmployeesActivity extends AppCompatActivity {
                         return;
                     }
                     int roleIndex = spinnerRole.getSelectedItemPosition();
-                    String role = (roleIndex == 0) ? "seller" : "senior_seller";
+                    String role;
+                    if (isGlobalAdmin) {
+                        role = roles[roleIndex];
+                    } else {
+                        role = (roleIndex == 0) ? "seller" : "senior_seller";
+                    }
                     createNewEmployee(name, role);
                 })
                 .setNegativeButton("Отмена", null)
@@ -271,7 +424,7 @@ public class EmployeesActivity extends AppCompatActivity {
                 JSONObject json = new JSONObject();
                 json.put("name", name);
                 json.put("role", role);
-                json.put("office_id", 0);
+                json.put("office_id", selectedOfficeId > 0 ? selectedOfficeId : currentUserOfficeId);
 
                 URL url = new URL(ApiClient.BASE_URL + "add_employee.php");
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -299,7 +452,6 @@ public class EmployeesActivity extends AppCompatActivity {
                             if (obj.getString("status").equals("success")) {
                                 Toast.makeText(EmployeesActivity.this, "Сотрудник создан", Toast.LENGTH_SHORT).show();
                                 loadEmployees();
-                                loadShops();
                             } else {
                                 Toast.makeText(EmployeesActivity.this, "Ошибка: " + obj.optString("message"), Toast.LENGTH_SHORT).show();
                             }
@@ -347,7 +499,6 @@ public class EmployeesActivity extends AppCompatActivity {
                     if (responseCode == 200) {
                         Toast.makeText(EmployeesActivity.this, "Сотрудник удалён", Toast.LENGTH_SHORT).show();
                         loadEmployees();
-                        loadShops();
                     } else {
                         Toast.makeText(EmployeesActivity.this, "Ошибка сервера: " + responseCode, Toast.LENGTH_SHORT).show();
                         adapter.notifyItemChanged(position);
@@ -361,6 +512,53 @@ public class EmployeesActivity extends AppCompatActivity {
                 });
             }
         }).start();
+    }
+
+    private void showEmployeeActionsDialog(Employee employee, int position) {
+        if (!canEdit) {
+            Toast.makeText(this, "Нет прав на редактирование", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        List<String> actions = new ArrayList<>();
+        List<Runnable> runnables = new ArrayList<>();
+
+        actions.add("Сменить офис");
+        runnables.add(() -> showOfficeDialog(employee, position));
+
+        actions.add("Изменить роль");
+        runnables.add(() -> showRoleDialog(employee, position));
+
+        new AlertDialog.Builder(this)
+                .setTitle(employee.name)
+                .setItems(actions.toArray(new String[0]), (dialog, which) -> runnables.get(which).run())
+                .show();
+    }
+
+    private void showOfficeDialog(Employee employee, int position) {
+        if (shopList.isEmpty()) {
+            Toast.makeText(this, "Список офисов пуст", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String[] officeNames = new String[shopList.size() + 1];
+        officeNames[0] = "Не привязан";
+        for (int i = 0; i < shopList.size(); i++) {
+            officeNames[i + 1] = shopList.get(i).name;
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle("Сменить офис: " + employee.name)
+                .setSingleChoiceItems(officeNames, 0, (dialog, which) -> {
+                    int newOfficeId = 0;
+                    if (which > 0) {
+                        newOfficeId = shopList.get(which - 1).id;
+                    }
+                    changeEmployeeOffice(employee.id, newOfficeId, position);
+                    dialog.dismiss();
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
     }
 
     private void changeEmployeeOffice(int employeeId, int newOfficeId, int position) {
@@ -392,7 +590,6 @@ public class EmployeesActivity extends AppCompatActivity {
                     if (responseCode == 200) {
                         Toast.makeText(EmployeesActivity.this, "Офис изменён", Toast.LENGTH_SHORT).show();
                         loadEmployees();
-                        loadShops();
                     } else {
                         Toast.makeText(EmployeesActivity.this, "Ошибка сервера: " + responseCode, Toast.LENGTH_SHORT).show();
                         adapter.notifyItemChanged(position);
@@ -406,6 +603,45 @@ public class EmployeesActivity extends AppCompatActivity {
                 });
             }
         }).start();
+    }
+
+    private void showRoleDialog(Employee employee, int position) {
+        List<String> roleOptions = new ArrayList<>();
+        List<String> roleValues = new ArrayList<>();
+
+        if (isGlobalAdmin) {
+            for (int i = 0; i < roles.length; i++) {
+                if (!roles[i].equals("bot") || currentUserRole.equals("owner")) {
+                    roleOptions.add(roleDisplayNames[i]);
+                    roleValues.add(roles[i]);
+                }
+            }
+        } else if (currentUserRole.equals("dm")) {
+            roleOptions.add("Специалист");
+            roleValues.add("seller");
+            roleOptions.add("Старший специалист");
+            roleValues.add("senior_seller");
+        }
+
+        int currentSelection = 0;
+        for (int i = 0; i < roleValues.size(); i++) {
+            if (roleValues.get(i).equals(employee.role)) {
+                currentSelection = i;
+                break;
+            }
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle("Изменить роль: " + employee.name)
+                .setSingleChoiceItems(roleOptions.toArray(new String[0]), currentSelection, (dialog, which) -> {
+                    String newRole = roleValues.get(which);
+                    if (!newRole.equals(employee.role)) {
+                        changeEmployeeRole(employee.id, newRole, position);
+                    }
+                    dialog.dismiss();
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
     }
 
     private void changeEmployeeRole(int employeeId, String newRole, int position) {
@@ -452,118 +688,29 @@ public class EmployeesActivity extends AppCompatActivity {
         }).start();
     }
 
-    private void showEmployeeActionsDialog(Employee employee, int position) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-
-        List<String> actions = new ArrayList<>();
-        List<Runnable> runnables = new ArrayList<>();
-
-        // Смена офиса (для owner, rgo и dm для сотрудников своего офиса)
-        if (currentUserRole.equals("owner") || currentUserRole.equals("rgo")) {
-            actions.add("Сменить офис");
-            runnables.add(() -> showOfficeDialog(employee, position));
-        } else if (currentUserRole.equals("dm") && employee.officeId == currentUserOfficeId) {
-            actions.add("Сменить офис");
-            runnables.add(() -> showOfficeDialog(employee, position));
-        }
-
-        // Смена роли
-        boolean canChangeRole = false;
-        if (currentUserRole.equals("owner") || currentUserRole.equals("rgo")) {
-            canChangeRole = true;
-        } else if (currentUserRole.equals("dm")) {
-            if (employee.officeId == currentUserOfficeId &&
-                    (employee.role.equals("seller") || employee.role.equals("senior_seller"))) {
-                canChangeRole = true;
-            }
-        }
-
-        if (canChangeRole) {
-            actions.add("Изменить роль");
-            runnables.add(() -> showRoleDialog(employee, position));
-        }
-
-        if (actions.isEmpty()) {
-            Toast.makeText(this, "Нет доступных действий", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        builder.setTitle(employee.name)
-                .setItems(actions.toArray(new String[0]), (dialog, which) -> runnables.get(which).run())
-                .show();
+    private void openEmployeeProfile(Employee employee) {
+        Intent intent = new Intent(EmployeesActivity.this, EmployeeDetailActivity.class);
+        intent.putExtra("employee_id", employee.id);
+        intent.putExtra("employee_name", employee.name);
+        intent.putExtra("employee_role", getRoleDisplayName(employee.role));
+        intent.putExtra("employee_office", getOfficeName(employee.officeId));
+        startActivity(intent);
     }
 
-    private void showOfficeDialog(Employee employee, int position) {
-        if (shopList.isEmpty()) {
-            Toast.makeText(this, "Список офисов пуст", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        String[] officeNames = new String[shopList.size() + 1];
-        officeNames[0] = "Не привязан";
-        for (int i = 0; i < shopList.size(); i++) {
-            officeNames[i + 1] = shopList.get(i).name;
-        }
-
-        int currentSelection = 0;
-        for (int i = 0; i < shopList.size(); i++) {
-            if (shopList.get(i).id == employee.officeId) {
-                currentSelection = i + 1;
-                break;
+    private String getOfficeName(int officeId) {
+        for (Shop shop : shopList) {
+            if (shop.id == officeId) {
+                return shop.name;
             }
         }
-
-        new AlertDialog.Builder(this)
-                .setTitle("Сменить офис: " + employee.name)
-                .setSingleChoiceItems(officeNames, currentSelection, (dialog, which) -> {
-                    int newOfficeId = 0;
-                    if (which > 0) {
-                        newOfficeId = shopList.get(which - 1).id;
-                    }
-                    changeEmployeeOffice(employee.id, newOfficeId, position);
-                    dialog.dismiss();
-                })
-                .setNegativeButton("Отмена", null)
-                .show();
+        return "";
     }
 
-    private void showRoleDialog(Employee employee, int position) {
-        List<String> roleOptions = new ArrayList<>();
-        List<String> roleValues = new ArrayList<>();
-
-        if (currentUserRole.equals("owner") || currentUserRole.equals("rgo")) {
-            for (int i = 0; i < roles.length; i++) {
-                if (!roles[i].equals("bot") || currentUserRole.equals("owner")) {
-                    roleOptions.add(roleDisplayNames[i]);
-                    roleValues.add(roles[i]);
-                }
-            }
-        } else if (currentUserRole.equals("dm")) {
-            roleOptions.add("Специалист");
-            roleValues.add("seller");
-            roleOptions.add("Старший специалист");
-            roleValues.add("senior_seller");
+    private String getRoleDisplayName(String role) {
+        for (int i = 0; i < roles.length; i++) {
+            if (roles[i].equals(role)) return roleDisplayNames[i];
         }
-
-        int currentSelection = 0;
-        for (int i = 0; i < roleValues.size(); i++) {
-            if (roleValues.get(i).equals(employee.role)) {
-                currentSelection = i;
-                break;
-            }
-        }
-
-        new AlertDialog.Builder(this)
-                .setTitle("Изменить роль: " + employee.name)
-                .setSingleChoiceItems(roleOptions.toArray(new String[0]), currentSelection, (dialog, which) -> {
-                    String newRole = roleValues.get(which);
-                    if (!newRole.equals(employee.role)) {
-                        changeEmployeeRole(employee.id, newRole, position);
-                    }
-                    dialog.dismiss();
-                })
-                .setNegativeButton("Отмена", null)
-                .show();
+        return role;
     }
 
     // ==================== ADAPTER ====================
@@ -585,7 +732,14 @@ public class EmployeesActivity extends AppCompatActivity {
             String officeName = getOfficeName(emp.officeId);
             holder.tvOffice.setText(officeName.isEmpty() ? "Не привязан" : officeName);
 
-            holder.itemView.setOnClickListener(v -> showEmployeeActionsDialog(emp, position));
+            holder.itemView.setOnClickListener(v -> openEmployeeProfile(emp));
+
+            if (canEdit) {
+                holder.itemView.setOnLongClickListener(v -> {
+                    showEmployeeActionsDialog(emp, position);
+                    return true;
+                });
+            }
         }
 
         @Override
@@ -601,26 +755,6 @@ public class EmployeesActivity extends AppCompatActivity {
             }
         }
     }
-
-    // ==================== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ====================
-
-    private String getOfficeName(int officeId) {
-        for (Shop shop : shopList) {
-            if (shop.id == officeId) {
-                return shop.name;
-            }
-        }
-        return "";
-    }
-
-    private String getRoleDisplayName(String role) {
-        for (int i = 0; i < roles.length; i++) {
-            if (roles[i].equals(role)) return roleDisplayNames[i];
-        }
-        return role;
-    }
-
-    // ==================== DATA CLASSES ====================
 
     static class Employee {
         int id;

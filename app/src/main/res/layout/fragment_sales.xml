@@ -4,36 +4,34 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
+    android:padding="20dp"
     android:background="#F5F5F5">
 
     <TextView
         android:id="@+id/tvEmployee"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Сотрудник: "
+        android:text="Сотрудник:"
         android:textSize="16sp"
         android:textStyle="bold"
-        android:textColor="#333333"
-        android:padding="16dp" />
+        android:layout_marginBottom="20dp"/>
 
     <GridLayout
-        android:id="@+id/gridSales"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:columnCount="2"
         android:rowCount="3"
-        android:layout_margin="16dp"
         android:alignmentMode="alignBounds">
 
         <!-- Телефон -->
         <androidx.cardview.widget.CardView
             android:id="@+id/cardPhone"
             android:layout_width="0dp"
-            android:layout_height="120dp"
+            android:layout_height="100dp"
             android:layout_columnWeight="1"
             android:layout_margin="8dp"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="4dp"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="2dp"
             android:clickable="true"
             android:focusable="true">
 
@@ -41,19 +39,18 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:orientation="vertical"
-                android:gravity="center"
-                android:padding="16dp">
+                android:gravity="center">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="📱"
-                    android:textSize="40sp" />
+                    android:textSize="32sp" />
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="ТЕЛЕФОН"
-                    android:textSize="14sp"
+                    android:textSize="12sp"
                     android:textStyle="bold"
                     android:layout_marginTop="8dp" />
             </LinearLayout>
@@ -63,11 +60,11 @@
         <androidx.cardview.widget.CardView
             android:id="@+id/cardSim"
             android:layout_width="0dp"
-            android:layout_height="120dp"
+            android:layout_height="100dp"
             android:layout_columnWeight="1"
             android:layout_margin="8dp"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="4dp"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="2dp"
             android:clickable="true"
             android:focusable="true">
 
@@ -75,19 +72,18 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:orientation="vertical"
-                android:gravity="center"
-                android:padding="16dp">
+                android:gravity="center">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="📡"
-                    android:textSize="40sp" />
+                    android:textSize="32sp" />
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="СИМ"
-                    android:textSize="14sp"
+                    android:textSize="12sp"
                     android:textStyle="bold"
                     android:layout_marginTop="8dp" />
             </LinearLayout>
@@ -97,11 +93,11 @@
         <androidx.cardview.widget.CardView
             android:id="@+id/cardAccessory"
             android:layout_width="0dp"
-            android:layout_height="120dp"
+            android:layout_height="100dp"
             android:layout_columnWeight="1"
             android:layout_margin="8dp"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="4dp"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="2dp"
             android:clickable="true"
             android:focusable="true">
 
@@ -109,19 +105,18 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:orientation="vertical"
-                android:gravity="center"
-                android:padding="16dp">
+                android:gravity="center">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="🎧"
-                    android:textSize="40sp" />
+                    android:textSize="32sp" />
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="АКСЕССУАР"
-                    android:textSize="14sp"
+                    android:textSize="12sp"
                     android:textStyle="bold"
                     android:layout_marginTop="8dp" />
             </LinearLayout>
@@ -131,11 +126,11 @@
         <androidx.cardview.widget.CardView
             android:id="@+id/cardAdapter"
             android:layout_width="0dp"
-            android:layout_height="120dp"
+            android:layout_height="100dp"
             android:layout_columnWeight="1"
             android:layout_margin="8dp"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="4dp"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="2dp"
             android:clickable="true"
             android:focusable="true">
 
@@ -143,19 +138,18 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:orientation="vertical"
-                android:gravity="center"
-                android:padding="16dp">
+                android:gravity="center">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="🔌"
-                    android:textSize="40sp" />
+                    android:textSize="32sp" />
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="АДАПТЕР"
-                    android:textSize="14sp"
+                    android:textSize="12sp"
                     android:textStyle="bold"
                     android:layout_marginTop="8dp" />
             </LinearLayout>
@@ -165,11 +159,11 @@
         <androidx.cardview.widget.CardView
             android:id="@+id/cardInternet"
             android:layout_width="0dp"
-            android:layout_height="120dp"
+            android:layout_height="100dp"
             android:layout_columnWeight="1"
             android:layout_margin="8dp"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="4dp"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="2dp"
             android:clickable="true"
             android:focusable="true">
 
@@ -177,19 +171,18 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:orientation="vertical"
-                android:gravity="center"
-                android:padding="16dp">
+                android:gravity="center">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="📶"
-                    android:textSize="40sp" />
+                    android:textSize="32sp" />
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="ШПД"
-                    android:textSize="14sp"
+                    android:textSize="12sp"
                     android:textStyle="bold"
                     android:layout_marginTop="8dp" />
             </LinearLayout>
@@ -199,11 +192,11 @@
         <androidx.cardview.widget.CardView
             android:id="@+id/cardFinance"
             android:layout_width="0dp"
-            android:layout_height="120dp"
+            android:layout_height="100dp"
             android:layout_columnWeight="1"
             android:layout_margin="8dp"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="4dp"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="2dp"
             android:clickable="true"
             android:focusable="true">
 
@@ -211,24 +204,37 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:orientation="vertical"
-                android:gravity="center"
-                android:padding="16dp">
+                android:gravity="center">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="💰"
-                    android:textSize="40sp" />
+                    android:textSize="32sp" />
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="ФИН. УСЛУГИ"
-                    android:textSize="14sp"
+                    android:textSize="12sp"
                     android:textStyle="bold"
                     android:layout_marginTop="8dp" />
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
     </GridLayout>
+
+    <!-- Надпись "Продажи за сегодня" -->
+    <TextView
+        android:id="@+id/tvTodaySales"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="📊 ПРОДАЖИ ЗА СЕГОДНЯ"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:textColor="#2196F3"
+        android:gravity="center"
+        android:padding="24dp"
+        android:clickable="true"
+        android:focusable="true" />
 
 </LinearLayout>

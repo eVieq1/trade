@@ -108,6 +108,7 @@ public class LoginActivity extends AppCompatActivity {
                     boolean exists = obj.getBoolean("exists");
                     String role = obj.optString("role", "seller");
                     int officeId = obj.optInt("office_id", 0);
+                    int employeeId = obj.optInt("id", 0);
                     String officeName = obj.optString("office_name", "Не привязан");
 
                     if (exists) {
@@ -116,6 +117,7 @@ public class LoginActivity extends AppCompatActivity {
                                 .putString("employee_name", name)
                                 .putString("user_role", role)
                                 .putInt("office_id", officeId)
+                                .putInt("employee_id", employeeId)
                                 .putString("office_name", officeName)
                                 .apply();
 

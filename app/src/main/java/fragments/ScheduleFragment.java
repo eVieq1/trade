@@ -1,11 +1,9 @@
 package com.example.salestracker.fragments;
 
 import android.content.Context;
-import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Typeface;
 import android.graphics.Color;
-import android.net.Uri;
 import android.os.Bundle;
 import android.text.SpannableStringBuilder;
 import android.text.style.AbsoluteSizeSpan;
@@ -26,6 +24,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.salestracker.ApiClient;
 import com.example.salestracker.CsvHelper;
+import com.example.salestracker.EditDayScheduleDialog;
 import com.example.salestracker.R;
 
 import org.json.JSONArray;
@@ -62,21 +61,12 @@ public class ScheduleFragment extends Fragment {
     private int currentPosition = 120;
     private MonthAdapter monthAdapter;
 
-    // Launchers
-    private ActivityResultLauncher<String> exportLauncher;
-
     private final String[] monthNamesNominative = {"Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
             "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"};
-
-    private final String[] monthNamesGenitive = {"января", "февраля", "марта", "апреля", "мая", "июня",
-            "июля", "августа", "сентября", "октября", "ноября", "декабря"};
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        exportLauncher = registerForActivityResult(new ActivityResultContracts.CreateDocument(), uri -> {
-            if (uri != null) exportToCsv(uri);
-        });
     }
 
     @Override
@@ -125,7 +115,14 @@ public class ScheduleFragment extends Fragment {
 
         if (isAdmin) {
             btnEditShift.setVisibility(View.VISIBLE);
-            btnEditShift.setOnClickListener(v -> showAddEmployeeDialog(selectedDay));
+            btnEditShift.setOnClickListener(v -> {
+                if (selectedDay > 0) {
+                    EditDayScheduleDialog dialog = new EditDayScheduleDialog(getContext(), currentYear, currentMonth + 1, selectedDay);
+                    dialog.show();
+                } else {
+                    Toast.makeText(getContext(), "Сначала выберите день", Toast.LENGTH_SHORT).show();
+                }
+            });
         } else {
             btnEditShift.setVisibility(View.GONE);
         }
@@ -251,23 +248,6 @@ public class ScheduleFragment extends Fragment {
         });
     }
 
-    private void saveToServer(int day, String employee, String shiftTime) {
-        apiClient.saveSchedule(currentYear, currentMonth + 1, day, employee, shiftTime, new ApiClient.ApiCallback() {
-            @Override
-            public void onSuccess(String response) {
-                Log.d(TAG, "Сохранено: " + response);
-            }
-
-            @Override
-            public void onError(String error) {
-                Log.e(TAG, "Ошибка сохранения: " + error);
-                if (getContext() != null) {
-                    Toast.makeText(getContext(), "Ошибка сохранения", Toast.LENGTH_SHORT).show();
-                }
-            }
-        });
-    }
-
     private void updateCalendar() {
         if (getContext() == null) return;
 
@@ -302,98 +282,6 @@ public class ScheduleFragment extends Fragment {
         }
     }
 
-    private void showAddEmployeeDialog(int day) {
-        if (day == 0) {
-            Toast.makeText(getContext(), "Сначала выберите день", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        if (employees.isEmpty()) {
-            Toast.makeText(getContext(), "Список сотрудников пуст", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        String[] employeeNames = new String[employees.size()];
-        for (int i = 0; i < employees.size(); i++) {
-            employeeNames[i] = employees.get(i).name;
-        }
-
-        String[] times = {"09:00-18:00", "10:00-19:00", "12:00-21:00", "Выходной", "Отпуск", "Больничный", "Другой офис"};
-
-        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
-
-        LinearLayout layout = new LinearLayout(getContext());
-        layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(48, 24, 48, 16);
-
-        TextView tvDay = new TextView(getContext());
-        tvDay.setText("Дата: " + day + " " + monthNamesGenitive[currentMonth]);
-        tvDay.setTextSize(16);
-        tvDay.setTypeface(Typeface.DEFAULT_BOLD);
-        tvDay.setPadding(0, 0, 0, 16);
-        layout.addView(tvDay);
-
-        TextView tvEmployeeLabel = new TextView(getContext());
-        tvEmployeeLabel.setText("Выберите сотрудника:");
-        tvEmployeeLabel.setTextSize(14);
-        tvEmployeeLabel.setPadding(0, 8, 0, 8);
-        layout.addView(tvEmployeeLabel);
-
-        Spinner spinnerEmployee = new Spinner(getContext());
-        ArrayAdapter<String> employeeAdapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_dropdown_item, employeeNames);
-        spinnerEmployee.setAdapter(employeeAdapter);
-        layout.addView(spinnerEmployee);
-
-        TextView tvTimeLabel = new TextView(getContext());
-        tvTimeLabel.setText("Выберите время/статус:");
-        tvTimeLabel.setTextSize(14);
-        tvTimeLabel.setPadding(0, 8, 0, 8);
-        layout.addView(tvTimeLabel);
-
-        Spinner spinnerTime = new Spinner(getContext());
-        ArrayAdapter<String> timeAdapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_dropdown_item, times);
-        spinnerTime.setAdapter(timeAdapter);
-        layout.addView(spinnerTime);
-
-        builder.setTitle("Добавить сотрудника")
-                .setView(layout)
-                .setPositiveButton("Добавить", (dialog, which) -> {
-                    String employee = spinnerEmployee.getSelectedItem().toString();
-                    String time = spinnerTime.getSelectedItem().toString();
-
-                    String key = currentYear + "-" + (currentMonth + 1) + "-" + day;
-                    List<ShiftData> currentShifts = shifts.get(key);
-                    if (currentShifts == null) currentShifts = new ArrayList<>();
-
-                    boolean exists = false;
-                    for (ShiftData s : currentShifts) {
-                        if (s.employee.equals(employee)) {
-                            exists = true;
-                            break;
-                        }
-                    }
-
-                    if (!exists) {
-                        currentShifts.add(new ShiftData(employee, time));
-                        shifts.put(key, currentShifts);
-                        saveToServer(day, employee, time);
-                        showDayInfo(selectedDay);
-                        updateCalendar();
-                        Toast.makeText(getContext(), "Сотрудник добавлен", Toast.LENGTH_SHORT).show();
-                    } else {
-                        Toast.makeText(getContext(), "Сотрудник уже есть в этот день", Toast.LENGTH_SHORT).show();
-                    }
-                })
-                .setNegativeButton("Отмена", null);
-
-        builder.show();
-    }
-
-    private boolean isNonWorkingShift(String shiftTime) {
-        return shiftTime != null && (shiftTime.equals("Выходной") || shiftTime.equals("Отпуск") ||
-                shiftTime.equals("Больничный") || shiftTime.equals("Другой офис"));
-    }
-
     private void showDayInfo(int day) {
         if (getContext() == null) return;
 
@@ -402,7 +290,7 @@ public class ScheduleFragment extends Fragment {
         int weekday = cal.get(Calendar.DAY_OF_WEEK) - 2;
         if (weekday < 0) weekday = 6;
         String[] weekDays = {"Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"};
-        tvSelectedDate.setText(weekDays[weekday] + " - " + day + " " + monthNamesGenitive[currentMonth]);
+        tvSelectedDate.setText(weekDays[weekday] + " - " + day + " " + monthNamesNominative[currentMonth]);
 
         String key = currentYear + "-" + (currentMonth + 1) + "-" + day;
         List<ShiftData> dayShifts = shifts.get(key);
@@ -448,7 +336,6 @@ public class ScheduleFragment extends Fragment {
 
                 card.addView(tvLeft);
                 card.addView(tvRight);
-                card.setOnClickListener(v -> showEditEmployeeDialog(data.employee, data.shiftTime, day));
                 llEmployeesList.addView(card);
             }
         } else {
@@ -461,169 +348,6 @@ public class ScheduleFragment extends Fragment {
             llEmployeesList.addView(tvEmpty);
         }
         updateUpdateTime();
-    }
-
-    // ==================== ДИАЛОГ РЕДАКТИРОВАНИЯ СМЕНЫ (С ПРОКРУТКОЙ) ====================
-
-    private void showEditEmployeeDialog(String employee, String currentShiftTime, int day) {
-        if (!isAdmin) {
-            Toast.makeText(getContext(), "Доступ только для директора, владельца или РГО", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
-        builder.setTitle("Редактировать смену: " + employee);
-
-        // Основной контейнер с ScrollView для прокрутки диалога
-        LinearLayout mainLayout = new LinearLayout(getContext());
-        mainLayout.setOrientation(LinearLayout.VERTICAL);
-        mainLayout.setPadding(48, 32, 48, 24);
-
-        ScrollView scrollView = new ScrollView(getContext());
-        scrollView.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT));
-
-        LinearLayout layout = new LinearLayout(getContext());
-        layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT));
-
-        // Текущая смена
-        TextView tvCurrent = new TextView(getContext());
-        tvCurrent.setText("Текущее: " + getDisplayText(currentShiftTime));
-        tvCurrent.setPadding(0, 0, 0, 16);
-        tvCurrent.setTextSize(14);
-        layout.addView(tvCurrent);
-
-        // Разделитель
-        TextView tvOr = new TextView(getContext());
-        tvOr.setText("──────────  Выберите тип  ──────────");
-        tvOr.setGravity(Gravity.CENTER);
-        tvOr.setPadding(0, 16, 0, 16);
-        tvOr.setTextSize(14);
-        layout.addView(tvOr);
-
-        // Spinner для выбора типа смены
-        Spinner spinnerType = new Spinner(getContext());
-        String[] types = {"Рабочий", "Выходной", "Отпуск", "Больничный", "Другой офис"};
-        ArrayAdapter<String> typeAdapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_dropdown_item, types);
-        spinnerType.setAdapter(typeAdapter);
-        layout.addView(spinnerType);
-
-        // Контейнер для времени
-        LinearLayout timeContainer = new LinearLayout(getContext());
-        timeContainer.setOrientation(LinearLayout.VERTICAL);
-        timeContainer.setPadding(0, 16, 0, 0);
-
-        TextView tvStart = new TextView(getContext());
-        tvStart.setText("Начало смены:");
-        tvStart.setPadding(0, 8, 0, 4);
-        tvStart.setTextSize(14);
-        timeContainer.addView(tvStart);
-
-        TimePicker startPicker = new TimePicker(getContext());
-        startPicker.setIs24HourView(true);
-        timeContainer.addView(startPicker);
-
-        TextView tvEnd = new TextView(getContext());
-        tvEnd.setText("Конец смены:");
-        tvEnd.setPadding(0, 16, 0, 4);
-        tvEnd.setTextSize(14);
-        timeContainer.addView(tvEnd);
-
-        TimePicker endPicker = new TimePicker(getContext());
-        endPicker.setIs24HourView(true);
-        timeContainer.addView(endPicker);
-
-        layout.addView(timeContainer);
-
-        spinnerType.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                timeContainer.setVisibility(position == 0 ? View.VISIBLE : View.GONE);
-            }
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {}
-        });
-
-        // Установка текущих значений
-        if (isNonWorkingShift(currentShiftTime)) {
-            if (currentShiftTime.equals("Выходной")) spinnerType.setSelection(1);
-            else if (currentShiftTime.equals("Отпуск")) spinnerType.setSelection(2);
-            else if (currentShiftTime.equals("Больничный")) spinnerType.setSelection(3);
-            else if (currentShiftTime.equals("Другой офис")) spinnerType.setSelection(4);
-            timeContainer.setVisibility(View.GONE);
-        } else {
-            spinnerType.setSelection(0);
-            if (currentShiftTime != null && currentShiftTime.contains("-")) {
-                try {
-                    String start = currentShiftTime.split("-")[0];
-                    String end = currentShiftTime.split("-")[1];
-                    startPicker.setHour(Integer.parseInt(start.split(":")[0]));
-                    startPicker.setMinute(Integer.parseInt(start.split(":")[1]));
-                    endPicker.setHour(Integer.parseInt(end.split(":")[0]));
-                    endPicker.setMinute(Integer.parseInt(end.split(":")[1]));
-                } catch (Exception e) {}
-            }
-        }
-
-        scrollView.addView(layout);
-        mainLayout.addView(scrollView);
-        builder.setView(mainLayout);
-
-        // Кнопки
-        builder.setPositiveButton("Сохранить", (dialog, which) -> {
-            String selectedType = spinnerType.getSelectedItem().toString();
-            String newShiftTime;
-            if (selectedType.equals("Рабочий")) {
-                newShiftTime = String.format(Locale.getDefault(), "%02d:%02d-%02d:%02d",
-                        startPicker.getHour(), startPicker.getMinute(),
-                        endPicker.getHour(), endPicker.getMinute());
-            } else {
-                newShiftTime = selectedType;
-            }
-            saveToServer(day, employee, newShiftTime);
-
-            String key = currentYear + "-" + (currentMonth + 1) + "-" + day;
-            List<ShiftData> currentShifts = shifts.get(key);
-            if (currentShifts == null) currentShifts = new ArrayList<>();
-            boolean found = false;
-            for (ShiftData s : currentShifts) {
-                if (s.employee.equals(employee)) {
-                    s.shiftTime = newShiftTime;
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                currentShifts.add(new ShiftData(employee, newShiftTime));
-            }
-            shifts.put(key, currentShifts);
-            showDayInfo(selectedDay);
-            updateCalendar();
-            Toast.makeText(getContext(), "Смена сохранена", Toast.LENGTH_SHORT).show();
-        });
-
-        builder.setNeutralButton("Удалить", (dialog, which) -> {
-            String key = currentYear + "-" + (currentMonth + 1) + "-" + day;
-            List<ShiftData> currentShifts = shifts.get(key);
-            if (currentShifts != null) {
-                currentShifts.removeIf(s -> s.employee.equals(employee));
-                if (currentShifts.isEmpty()) shifts.remove(key);
-                else shifts.put(key, currentShifts);
-            }
-            showDayInfo(selectedDay);
-            updateCalendar();
-            Toast.makeText(getContext(), "Сотрудник удален", Toast.LENGTH_SHORT).show();
-            saveToServer(day, employee, "");
-        });
-
-        builder.setNegativeButton("Отмена", null);
-
-        AlertDialog dialog = builder.create();
-        dialog.show();
     }
 
     private int getStatusColor(String shiftTime) {
@@ -664,39 +388,6 @@ public class ScheduleFragment extends Fragment {
             case "Другой офис": return "Другой офис";
             default: return shiftTime;
         }
-    }
-
-    public void refreshData() {
-        if (getContext() != null) {
-            loadFromServer();
-            Toast.makeText(getContext(), "Данные обновлены", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    public void exportToExcel() {
-        exportLauncher.launch("schedules_" + currentYear + "_" + (currentMonth + 1) + ".csv");
-    }
-
-    private void exportToCsv(Uri uri) {
-        try {
-            File cacheFile = new File(requireContext().getCacheDir(), "schedules_" + currentYear + "_" + (currentMonth + 1) + ".csv");
-            CsvHelper csvHelper = new CsvHelper(getContext());
-            csvHelper.exportToCsvToFile(currentYear, currentMonth + 1, shifts, employees, cacheFile);
-            sendEmailWithCsv(uri);
-        } catch (Exception e) {
-            Toast.makeText(getContext(), "Ошибка: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private void sendEmailWithCsv(Uri uri) {
-        Intent emailIntent = new Intent(Intent.ACTION_SEND);
-        emailIntent.setType("text/csv");
-        emailIntent.putExtra(Intent.EXTRA_STREAM, uri);
-        emailIntent.putExtra(Intent.EXTRA_EMAIL, new String[]{"eVieq@yandex.ru"});
-        emailIntent.putExtra(Intent.EXTRA_SUBJECT, "Экспорт смен за " + monthNamesNominative[currentMonth] + " " + currentYear);
-        emailIntent.putExtra(Intent.EXTRA_TEXT, "Файл с графиком смен прилагается.");
-        emailIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        startActivity(Intent.createChooser(emailIntent, "Отправить email"));
     }
 
     // ==================== ADAPTERS ====================

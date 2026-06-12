@@ -2,22 +2,23 @@ package com.example.salestracker;
 
 import android.app.AlertDialog;
 import android.app.ProgressDialog;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
-import android.view.Menu;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.*;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
-import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
+
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -36,6 +37,9 @@ public class ShopEmployeesActivity extends AppCompatActivity {
     private int shopId;
     private String shopName;
     private ApiClient apiClient;
+    private Button btnAddEmployee;
+    private Button btnEditPlans;
+    private boolean canEdit;
 
     private final String[] roles = {"owner", "rgo", "dm", "senior_seller", "seller"};
     private final String[] roleDisplayNames = {"Владелец", "РГО", "Директор", "Старший специалист", "Специалист"};
@@ -60,49 +64,39 @@ public class ShopEmployeesActivity extends AppCompatActivity {
         adapter = new EmployeeAdapter();
         recyclerView.setAdapter(adapter);
 
+        btnAddEmployee = findViewById(R.id.btnAddEmployee);
+        btnEditPlans = findViewById(R.id.btnEditPlans);
+
         SharedPreferences prefs = getSharedPreferences("app", MODE_PRIVATE);
         currentUserRole = prefs.getString("user_role", "seller");
 
-        boolean canEdit = currentUserRole.equals("owner") || currentUserRole.equals("rgo");
+        canEdit = currentUserRole.equals("owner") || currentUserRole.equals("rgo") || currentUserRole.equals("dm");
+
+        // Кнопка "Добавить сотрудника"
         if (canEdit) {
-            findViewById(R.id.btnAddEmployee).setVisibility(View.VISIBLE);
-            findViewById(R.id.btnAddEmployee).setOnClickListener(v -> showAddEmployeeDialog());
-            setupSwipeToDelete();
+            btnAddEmployee.setVisibility(View.VISIBLE);
+            btnAddEmployee.setOnClickListener(v -> showAddEmployeeDialog());
         } else {
-            findViewById(R.id.btnAddEmployee).setVisibility(View.GONE);
+            btnAddEmployee.setVisibility(View.GONE);
+        }
+
+        // Кнопка "Изменить планы" (для owner, rgo, dm)
+        boolean canEditPlans = currentUserRole.equals("owner") || currentUserRole.equals("rgo") || currentUserRole.equals("dm");
+        if (canEditPlans) {
+            btnEditPlans.setVisibility(View.VISIBLE);
+            btnEditPlans.setOnClickListener(v -> {
+                Intent intent = new Intent(ShopEmployeesActivity.this, PlanSettingsActivity.class);
+                intent.putExtra("office_id", shopId);
+                intent.putExtra("office_name", shopName);
+                startActivity(intent);
+            });
+        } else {
+            btnEditPlans.setVisibility(View.GONE);
         }
 
         loadShops();
         loadAllEmployees();
         loadEmployees();
-    }
-
-    private void setupSwipeToDelete() {
-        ItemTouchHelper.SimpleCallback swipeCallback = new ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT) {
-            @Override
-            public boolean onMove(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder, @NonNull RecyclerView.ViewHolder target) {
-                return false;
-            }
-
-            @Override
-            public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
-                int position = viewHolder.getAdapterPosition();
-                Employee employee = employeeList.get(position);
-
-                new AlertDialog.Builder(ShopEmployeesActivity.this)
-                        .setTitle("Удалить сотрудника из офиса")
-                        .setMessage("Вы уверены, что хотите удалить " + employee.name + " из офиса " + shopName + "?")
-                        .setPositiveButton("Удалить", (dialog, which) -> removeEmployeeFromOffice(employee.id, position))
-                        .setNegativeButton("Отмена", (dialog, which) -> adapter.notifyItemChanged(position))
-                        .show();
-            }
-        };
-        new ItemTouchHelper(swipeCallback).attachToRecyclerView(recyclerView);
-    }
-
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        return false;
     }
 
     private void loadShops() {
@@ -130,12 +124,9 @@ public class ShopEmployeesActivity extends AppCompatActivity {
     }
 
     private void loadAllEmployees() {
-        Log.d("ShopEmployeesActivity", "=== loadAllEmployees вызван ===");
-
         apiClient.getEmployees(new ApiClient.ApiCallback() {
             @Override
             public void onSuccess(String response) {
-                Log.d("ShopEmployeesActivity", "getEmployees (all) ответ: " + response);
                 try {
                     JSONObject obj = new JSONObject(response);
                     JSONArray arr = obj.getJSONArray("employees");
@@ -149,7 +140,6 @@ public class ShopEmployeesActivity extends AppCompatActivity {
                                 emp.optInt("office_id", 0)
                         ));
                     }
-                    Log.d("ShopEmployeesActivity", "Всего сотрудников: " + allEmployees.size());
                 } catch (Exception e) {
                     Log.e("ShopEmployeesActivity", "Ошибка парсинга allEmployees: " + e.getMessage());
                 }
@@ -163,9 +153,6 @@ public class ShopEmployeesActivity extends AppCompatActivity {
     }
 
     private void loadEmployees() {
-        Log.d("ShopEmployeesActivity", "=== loadEmployees вызван ===");
-        Log.d("ShopEmployeesActivity", "Загружаем сотрудников для офиса ID: " + shopId);
-
         employeeList.clear();
         adapter.notifyDataSetChanged();
 
@@ -176,8 +163,6 @@ public class ShopEmployeesActivity extends AppCompatActivity {
         apiClient.getEmployees(new ApiClient.ApiCallback() {
             @Override
             public void onSuccess(String response) {
-                Log.d("ShopEmployeesActivity", "getEmployees ответ: " + response);
-
                 runOnUiThread(() -> progress.dismiss());
 
                 try {
@@ -201,7 +186,6 @@ public class ShopEmployeesActivity extends AppCompatActivity {
                             }
                         }
 
-                        Log.d("ShopEmployeesActivity", "Найдено сотрудников в этом офисе: " + employeeList.size());
                         runOnUiThread(() -> {
                             adapter.notifyDataSetChanged();
                             if (employeeList.isEmpty()) {
@@ -226,48 +210,117 @@ public class ShopEmployeesActivity extends AppCompatActivity {
         });
     }
 
-    private void removeEmployeeFromOffice(int employeeId, int position) {
-        ProgressDialog progress = new ProgressDialog(this);
-        progress.setMessage("Удаление...");
-        progress.show();
+    // ==================== ДИАЛОГИ ДЕЙСТВИЙ ====================
 
-        new Thread(() -> {
-            try {
-                JSONObject json = new JSONObject();
-                json.put("employee_id", employeeId);
-                json.put("office_id", 0);
+    private void showActionsDialog(Employee employee, int position) {
+        List<String> actions = new ArrayList<>();
+        List<Runnable> runnables = new ArrayList<>();
 
-                URL url = new URL(ApiClient.BASE_URL + "update_employee_office.php");
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("POST");
-                conn.setRequestProperty("Content-Type", "application/json");
-                conn.setDoOutput(true);
+        if (canEdit) {
+            actions.add("Сменить офис");
+            runnables.add(() -> showOfficeDialog(employee, position));
 
-                OutputStream os = conn.getOutputStream();
-                os.write(json.toString().getBytes("UTF-8"));
-                os.close();
+            actions.add("Изменить роль");
+            runnables.add(() -> showRoleDialog(employee, position));
 
-                int responseCode = conn.getResponseCode();
-                runOnUiThread(() -> {
-                    progress.dismiss();
-                    if (responseCode == 200) {
-                        Toast.makeText(ShopEmployeesActivity.this, "Сотрудник удалён из офиса", Toast.LENGTH_SHORT).show();
-                        loadEmployees();
-                        loadAllEmployees();
-                    } else {
-                        Toast.makeText(ShopEmployeesActivity.this, "Ошибка сервера: " + responseCode, Toast.LENGTH_SHORT).show();
-                        adapter.notifyItemChanged(position);
-                    }
-                });
-            } catch (Exception e) {
-                runOnUiThread(() -> {
-                    progress.dismiss();
-                    Toast.makeText(ShopEmployeesActivity.this, "Ошибка: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                    adapter.notifyItemChanged(position);
-                });
-            }
-        }).start();
+            actions.add("Удалить сотрудника");
+            runnables.add(() -> confirmDelete(employee, position));
+        }
+
+        if (actions.isEmpty()) {
+            Toast.makeText(this, "Нет доступных действий", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle(employee.name)
+                .setItems(actions.toArray(new String[0]), (dialog, which) -> runnables.get(which).run())
+                .show();
     }
+
+    private void showOfficeDialog(Employee employee, int position) {
+        if (shopList.isEmpty()) {
+            Toast.makeText(this, "Список офисов пуст", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String[] officeNames = new String[shopList.size() + 1];
+        officeNames[0] = "Не привязан";
+        for (int i = 0; i < shopList.size(); i++) {
+            officeNames[i + 1] = shopList.get(i).name;
+        }
+
+        int currentSelection = 0;
+        for (int i = 0; i < shopList.size(); i++) {
+            if (shopList.get(i).id == employee.officeId) {
+                currentSelection = i + 1;
+                break;
+            }
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle("Сменить офис: " + employee.name)
+                .setSingleChoiceItems(officeNames, currentSelection, (dialog, which) -> {
+                    int newOfficeId = 0;
+                    if (which > 0) {
+                        newOfficeId = shopList.get(which - 1).id;
+                    }
+                    changeEmployeeOffice(employee.id, newOfficeId, position);
+                    dialog.dismiss();
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
+    }
+
+    private void showRoleDialog(Employee employee, int position) {
+        List<String> roleOptions = new ArrayList<>();
+        List<String> roleValues = new ArrayList<>();
+
+        if (currentUserRole.equals("owner") || currentUserRole.equals("rgo")) {
+            roleOptions.add("Специалист");
+            roleValues.add("seller");
+            roleOptions.add("Старший специалист");
+            roleValues.add("senior_seller");
+            roleOptions.add("Директор");
+            roleValues.add("dm");
+        } else if (currentUserRole.equals("dm")) {
+            roleOptions.add("Специалист");
+            roleValues.add("seller");
+            roleOptions.add("Старший специалист");
+            roleValues.add("senior_seller");
+        }
+
+        int currentSelection = 0;
+        for (int i = 0; i < roleValues.size(); i++) {
+            if (roleValues.get(i).equals(employee.role)) {
+                currentSelection = i;
+                break;
+            }
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle("Изменить роль: " + employee.name)
+                .setSingleChoiceItems(roleOptions.toArray(new String[0]), currentSelection, (dialog, which) -> {
+                    String newRole = roleValues.get(which);
+                    if (!newRole.equals(employee.role)) {
+                        changeEmployeeRole(employee.id, newRole, position);
+                    }
+                    dialog.dismiss();
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
+    }
+
+    private void confirmDelete(Employee employee, int position) {
+        new AlertDialog.Builder(this)
+                .setTitle("Удалить сотрудника")
+                .setMessage("Вы уверены, что хотите удалить " + employee.name + "?")
+                .setPositiveButton("Удалить", (dialog, which) -> deleteEmployee(employee.id, position))
+                .setNegativeButton("Отмена", (dialog, which) -> adapter.notifyItemChanged(position))
+                .show();
+    }
+
+    // ==================== API ВЫЗОВЫ ====================
 
     private void changeEmployeeOffice(int employeeId, int newOfficeId, int position) {
         ProgressDialog progress = new ProgressDialog(this);
@@ -285,6 +338,8 @@ public class ShopEmployeesActivity extends AppCompatActivity {
                 conn.setRequestMethod("POST");
                 conn.setRequestProperty("Content-Type", "application/json");
                 conn.setDoOutput(true);
+                conn.setConnectTimeout(15000);
+                conn.setReadTimeout(15000);
 
                 OutputStream os = conn.getOutputStream();
                 os.write(json.toString().getBytes("UTF-8"));
@@ -328,6 +383,8 @@ public class ShopEmployeesActivity extends AppCompatActivity {
                 conn.setRequestMethod("POST");
                 conn.setRequestProperty("Content-Type", "application/json");
                 conn.setDoOutput(true);
+                conn.setConnectTimeout(15000);
+                conn.setReadTimeout(15000);
 
                 OutputStream os = conn.getOutputStream();
                 os.write(json.toString().getBytes("UTF-8"));
@@ -355,100 +412,17 @@ public class ShopEmployeesActivity extends AppCompatActivity {
         }).start();
     }
 
-    private void showEmployeeActionsDialog(Employee employee, int position) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-
-        List<String> actions = new ArrayList<>();
-        List<Runnable> runnables = new ArrayList<>();
-
-        // Смена офиса (для владельца и РГО)
-        if (currentUserRole.equals("owner") || currentUserRole.equals("rgo")) {
-            actions.add("Сменить офис");
-            runnables.add(() -> showOfficeDialog(employee, position));
-        }
-
-        // Смена роли (для владельца и РГО)
-        if (currentUserRole.equals("owner") || currentUserRole.equals("rgo")) {
-            actions.add("Изменить роль");
-            runnables.add(() -> showRoleDialog(employee, position));
-        }
-
-        if (actions.isEmpty()) {
-            Toast.makeText(this, "Нет доступных действий", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        builder.setTitle(employee.name)
-                .setItems(actions.toArray(new String[0]), (dialog, which) -> runnables.get(which).run())
-                .show();
-    }
-
-    private void showOfficeDialog(Employee employee, int position) {
-        if (shopList.isEmpty()) {
-            Toast.makeText(this, "Список офисов пуст", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        String[] officeNames = new String[shopList.size() + 1];
-        officeNames[0] = "Не привязан";
-        for (int i = 0; i < shopList.size(); i++) {
-            officeNames[i + 1] = shopList.get(i).name;
-        }
-
-        new AlertDialog.Builder(this)
-                .setTitle("Сменить офис: " + employee.name)
-                .setItems(officeNames, (dialog, which) -> {
-                    int newOfficeId = 0;
-                    if (which > 0) {
-                        newOfficeId = shopList.get(which - 1).id;
-                    }
-                    changeEmployeeOffice(employee.id, newOfficeId, position);
-                })
-                .show();
-    }
-
-    private void showRoleDialog(Employee employee, int position) {
-        List<String> roleOptions = new ArrayList<>();
-        List<String> roleValues = new ArrayList<>();
-
-        // Доступные роли для смены
-        roleOptions.add("Специалист");
-        roleValues.add("seller");
-        roleOptions.add("Старший специалист");
-        roleValues.add("senior_seller");
-        roleOptions.add("Директор");
-        roleValues.add("dm");
-
-        new AlertDialog.Builder(this)
-                .setTitle("Изменить роль: " + employee.name)
-                .setItems(roleOptions.toArray(new String[0]), (dialog, which) -> {
-                    String newRole = roleValues.get(which);
-                    if (!newRole.equals(employee.role)) {
-                        changeEmployeeRole(employee.id, newRole, position);
-                    }
-                })
-                .show();
-    }
-
-    private void moveEmployeeToShop(int employeeId) {
-        Log.d("ShopEmployeesActivity", "=== moveEmployeeToShop вызван ===");
-        Log.d("ShopEmployeesActivity", "employeeId: " + employeeId);
-        Log.d("ShopEmployeesActivity", "shopId: " + shopId);
-
+    private void deleteEmployee(int id, int position) {
         ProgressDialog progress = new ProgressDialog(this);
-        progress.setMessage("Перемещение...");
+        progress.setMessage("Удаление...");
         progress.show();
 
         new Thread(() -> {
             try {
                 JSONObject json = new JSONObject();
-                json.put("employee_id", employeeId);
-                json.put("office_id", shopId);
+                json.put("id", id);
 
-                String jsonString = json.toString();
-                Log.d("ShopEmployeesActivity", "Отправляем JSON: " + jsonString);
-
-                URL url = new URL(ApiClient.BASE_URL + "update_employee_office.php");
+                URL url = new URL(ApiClient.BASE_URL + "delete_employee.php");
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
                 conn.setRequestProperty("Content-Type", "application/json");
@@ -457,46 +431,32 @@ public class ShopEmployeesActivity extends AppCompatActivity {
                 conn.setReadTimeout(15000);
 
                 OutputStream os = conn.getOutputStream();
-                os.write(jsonString.getBytes("UTF-8"));
+                os.write(json.toString().getBytes("UTF-8"));
                 os.close();
 
                 int responseCode = conn.getResponseCode();
-                Log.d("ShopEmployeesActivity", "Response code: " + responseCode);
-
-                Scanner s = new Scanner(conn.getInputStream(), "UTF-8").useDelimiter("\\A");
-                String response = s.hasNext() ? s.next() : "";
-                Log.d("ShopEmployeesActivity", "Сервер ответил: " + response);
-
                 runOnUiThread(() -> {
                     progress.dismiss();
                     if (responseCode == 200) {
-                        try {
-                            JSONObject obj = new JSONObject(response);
-                            String status = obj.getString("status");
-                            if (status.equals("success")) {
-                                Toast.makeText(ShopEmployeesActivity.this, "Сотрудник добавлен в офис", Toast.LENGTH_SHORT).show();
-                                loadAllEmployees();
-                                loadEmployees();
-                            } else {
-                                Toast.makeText(ShopEmployeesActivity.this, "Ошибка: " + status, Toast.LENGTH_SHORT).show();
-                            }
-                        } catch (Exception e) {
-                            Log.e("ShopEmployeesActivity", "Ошибка парсинга: " + e.getMessage());
-                            Toast.makeText(ShopEmployeesActivity.this, "Ошибка: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                        }
+                        Toast.makeText(ShopEmployeesActivity.this, "Сотрудник удалён", Toast.LENGTH_SHORT).show();
+                        loadEmployees();
+                        loadAllEmployees();
                     } else {
                         Toast.makeText(ShopEmployeesActivity.this, "Ошибка сервера: " + responseCode, Toast.LENGTH_SHORT).show();
+                        adapter.notifyItemChanged(position);
                     }
                 });
             } catch (Exception e) {
-                Log.e("ShopEmployeesActivity", "Исключение: " + e.getMessage());
                 runOnUiThread(() -> {
                     progress.dismiss();
                     Toast.makeText(ShopEmployeesActivity.this, "Ошибка: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    adapter.notifyItemChanged(position);
                 });
             }
         }).start();
     }
+
+    // ==================== ДОБАВЛЕНИЕ СОТРУДНИКА ====================
 
     private void showAddEmployeeDialog() {
         String[] options = {"Выбрать существующего сотрудника", "Создать нового сотрудника"};
@@ -538,6 +498,49 @@ public class ShopEmployeesActivity extends AppCompatActivity {
                     moveEmployeeToShop(selected.id);
                 })
                 .show();
+    }
+
+    private void moveEmployeeToShop(int employeeId) {
+        ProgressDialog progress = new ProgressDialog(this);
+        progress.setMessage("Перемещение...");
+        progress.show();
+
+        new Thread(() -> {
+            try {
+                JSONObject json = new JSONObject();
+                json.put("employee_id", employeeId);
+                json.put("office_id", shopId);
+
+                URL url = new URL(ApiClient.BASE_URL + "update_employee_office.php");
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json");
+                conn.setDoOutput(true);
+                conn.setConnectTimeout(15000);
+                conn.setReadTimeout(15000);
+
+                OutputStream os = conn.getOutputStream();
+                os.write(json.toString().getBytes("UTF-8"));
+                os.close();
+
+                int responseCode = conn.getResponseCode();
+                runOnUiThread(() -> {
+                    progress.dismiss();
+                    if (responseCode == 200) {
+                        Toast.makeText(ShopEmployeesActivity.this, "Сотрудник добавлен в офис", Toast.LENGTH_SHORT).show();
+                        loadAllEmployees();
+                        loadEmployees();
+                    } else {
+                        Toast.makeText(ShopEmployeesActivity.this, "Ошибка сервера: " + responseCode, Toast.LENGTH_SHORT).show();
+                    }
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    progress.dismiss();
+                    Toast.makeText(ShopEmployeesActivity.this, "Ошибка: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                });
+            }
+        }).start();
     }
 
     private void showCreateNewEmployeeDialog() {
@@ -593,6 +596,8 @@ public class ShopEmployeesActivity extends AppCompatActivity {
                 conn.setRequestMethod("POST");
                 conn.setRequestProperty("Content-Type", "application/json");
                 conn.setDoOutput(true);
+                conn.setConnectTimeout(15000);
+                conn.setReadTimeout(15000);
 
                 OutputStream os = conn.getOutputStream();
                 os.write(json.toString().getBytes("UTF-8"));
@@ -618,6 +623,8 @@ public class ShopEmployeesActivity extends AppCompatActivity {
         }).start();
     }
 
+    // ==================== АДАПТЕР ====================
+
     private class EmployeeAdapter extends RecyclerView.Adapter<EmployeeAdapter.ViewHolder> {
         @NonNull
         @Override
@@ -632,7 +639,23 @@ public class ShopEmployeesActivity extends AppCompatActivity {
             holder.tvName.setText(emp.name);
             holder.tvRole.setText(getRoleDisplayName(emp.role));
 
-            holder.itemView.setOnClickListener(v -> showEmployeeActionsDialog(emp, position));
+            // КЛИК → открыть профиль
+            holder.itemView.setOnClickListener(v -> {
+                Intent intent = new Intent(ShopEmployeesActivity.this, EmployeeDetailActivity.class);
+                intent.putExtra("employee_id", emp.id);
+                intent.putExtra("employee_name", emp.name);
+                intent.putExtra("employee_role", emp.role);
+                intent.putExtra("employee_office", getOfficeName(emp.officeId));
+                startActivity(intent);
+            });
+
+            // ДОЛГОЕ НАЖАТИЕ → меню действий
+            if (canEdit) {
+                holder.itemView.setOnLongClickListener(v -> {
+                    showActionsDialog(emp, position);
+                    return true;
+                });
+            }
         }
 
         @Override
@@ -648,12 +671,25 @@ public class ShopEmployeesActivity extends AppCompatActivity {
         }
     }
 
+    // ==================== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ====================
+
     private String getRoleDisplayName(String role) {
         for (int i = 0; i < roles.length; i++) {
             if (roles[i].equals(role)) return roleDisplayNames[i];
         }
         return role;
     }
+
+    private String getOfficeName(int officeId) {
+        for (Shop shop : shopList) {
+            if (shop.id == officeId) {
+                return shop.name;
+            }
+        }
+        return "";
+    }
+
+    // ==================== DATA CLASSES ====================
 
     static class Employee {
         int id;
@@ -680,5 +716,13 @@ public class ShopEmployeesActivity extends AppCompatActivity {
     public boolean onSupportNavigateUp() {
         finish();
         return true;
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (apiClient != null) {
+            apiClient.shutdown();
+        }
     }
 }
