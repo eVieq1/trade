@@ -4,7 +4,6 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import java.net.URLEncoder;
-import java.util.Locale;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -217,42 +216,12 @@ public class ApiClient {
         });
     }
 
-    // ==================== МЕТОД ДЛЯ ПОЛУЧЕНИЯ ПРОДАЖ ЗА МЕСЯЦ (ДЛЯ ПЛАНОВ) ====================
-    public void getMonthSales(int year, int month, int officeId, ApiCallback callback) {
+    // ==================== МЕТОД ДЛЯ ПОЛУЧЕНИЯ ПРОДАЖ ЗА МЕСЯЦ ====================
+    public void getMonthSales(int officeId, int year, int month, ApiCallback callback) {
         executeSafe(() -> {
             HttpURLConnection conn = null;
             try {
-                String urlString = BASE_URL + "get_month_sales.php?year=" + year + "&month=" + month + "&office_id=" + officeId;
-                URL url = new URL(urlString);
-                conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("GET");
-                conn.setConnectTimeout(15000);
-                conn.setReadTimeout(15000);
-                conn.setRequestProperty("Accept", "application/json");
-
-                int responseCode = conn.getResponseCode();
-                if (responseCode == 200) {
-                    Scanner s = new Scanner(conn.getInputStream(), "UTF-8").useDelimiter("\\A");
-                    String response = s.hasNext() ? s.next() : "";
-                    s.close();
-                    handler.post(() -> callback.onSuccess(response));
-                } else {
-                    handler.post(() -> callback.onError("HTTP " + responseCode));
-                }
-            } catch (Exception e) {
-                handler.post(() -> callback.onError(e.getMessage()));
-            } finally {
-                if (conn != null) conn.disconnect();
-            }
-        });
-    }
-
-    // ==================== МЕТОД ДЛЯ ПОЛУЧЕНИЯ ПРОДАЖ ЗА МЕСЯЦ (СТАРЫЙ) ====================
-    public void getSalesByMonth(int year, int month, int officeId, ApiCallback callback) {
-        executeSafe(() -> {
-            HttpURLConnection conn = null;
-            try {
-                String urlString = BASE_URL + "get_sales_by_month.php?year=" + year + "&month=" + month + "&office_id=" + officeId;
+                String urlString = BASE_URL + "get_month_sales.php?office_id=" + officeId + "&year=" + year + "&month=" + month;
                 URL url = new URL(urlString);
                 conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("GET");
@@ -650,7 +619,38 @@ public class ApiClient {
                 if (conn != null) conn.disconnect();
             }
         });
-    }// ==================== МЕТОД ДЛЯ ПОЛУЧЕНИЯ ПЛАНОВ И ФАКТА ОФИСА ====================
+    }
+
+    // ==================== МЕТОДЫ ДЛЯ ПЛАНОВ ====================
+
+    public void getEmployeePlanData(int employeeId, int year, int month, String period, ApiCallback callback) {
+        executeSafe(() -> {
+            HttpURLConnection conn = null;
+            try {
+                String urlString = BASE_URL + "get_employee_plan_data.php?employee_id=" + employeeId + "&year=" + year + "&month=" + month + "&period=" + period;
+                URL url = new URL(urlString);
+                conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("GET");
+                conn.setConnectTimeout(15000);
+                conn.setReadTimeout(15000);
+                conn.setRequestProperty("Accept", "application/json");
+
+                final int responseCode = conn.getResponseCode();
+                if (responseCode == 200) {
+                    Scanner s = new Scanner(conn.getInputStream(), "UTF-8").useDelimiter("\\A");
+                    final String response = s.hasNext() ? s.next() : "";
+                    s.close();
+                    handler.post(() -> callback.onSuccess(response));
+                } else {
+                    handler.post(() -> callback.onError("HTTP " + responseCode));
+                }
+            } catch (Exception e) {
+                handler.post(() -> callback.onError(e.getMessage()));
+            } finally {
+                if (conn != null) conn.disconnect();
+            }
+        });
+    }
 
     public void getOfficePlanData(int officeId, int year, int month, String period, ApiCallback callback) {
         executeSafe(() -> {
@@ -679,19 +679,139 @@ public class ApiClient {
                 if (conn != null) conn.disconnect();
             }
         });
-    }// ==================== МЕТОД ДЛЯ ПОЛУЧЕНИЯ ПЛАНОВ И ФАКТА СОТРУДНИКА ====================
+    }
 
-    public void getEmployeePlanData(int employeeId, int year, int month, String period, ApiCallback callback) {
+    // ==================== МЕТОДЫ ДЛЯ ЗАДАЧ ====================
+
+    public void getTasks(int officeId, String userRole, ApiCallback callback) {
         executeSafe(() -> {
             HttpURLConnection conn = null;
             try {
-                String urlString = BASE_URL + "get_employee_plan_data.php?employee_id=" + employeeId + "&year=" + year + "&month=" + month + "&period=" + period;
+                String urlString = BASE_URL + "get_tasks.php?office_id=" + officeId + "&user_role=" + userRole;
                 URL url = new URL(urlString);
                 conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("GET");
                 conn.setConnectTimeout(15000);
                 conn.setReadTimeout(15000);
                 conn.setRequestProperty("Accept", "application/json");
+
+                final int responseCode = conn.getResponseCode();
+                if (responseCode == 200) {
+                    Scanner s = new Scanner(conn.getInputStream(), "UTF-8").useDelimiter("\\A");
+                    final String response = s.hasNext() ? s.next() : "";
+                    s.close();
+                    handler.post(() -> callback.onSuccess(response));
+                } else {
+                    handler.post(() -> callback.onError("HTTP " + responseCode));
+                }
+            } catch (Exception e) {
+                handler.post(() -> callback.onError(e.getMessage()));
+            } finally {
+                if (conn != null) conn.disconnect();
+            }
+        });
+    }
+
+    public void addTask(int officeId, String title, String deadline, String priority, int createdBy, ApiCallback callback) {
+        executeSafe(() -> {
+            HttpURLConnection conn = null;
+            try {
+                JSONObject json = new JSONObject();
+                json.put("office_id", officeId);
+                json.put("title", title);
+                json.put("deadline", deadline == null || deadline.isEmpty() ? JSONObject.NULL : deadline);
+                json.put("priority", priority);
+                json.put("created_by", createdBy);
+
+                Log.d("ApiClient", "addTask отправляем: " + json.toString());
+
+                URL url = new URL(BASE_URL + "add_task.php");
+                conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json");
+                conn.setDoOutput(true);
+                conn.setConnectTimeout(15000);
+                conn.setReadTimeout(15000);
+
+                OutputStream os = conn.getOutputStream();
+                os.write(json.toString().getBytes("UTF-8"));
+                os.close();
+
+                final int responseCode = conn.getResponseCode();
+                Log.d("ApiClient", "addTask responseCode: " + responseCode);
+
+                if (responseCode == 200) {
+                    Scanner s = new Scanner(conn.getInputStream(), "UTF-8").useDelimiter("\\A");
+                    final String response = s.hasNext() ? s.next() : "";
+                    s.close();
+                    handler.post(() -> callback.onSuccess(response));
+                } else {
+                    handler.post(() -> callback.onError("HTTP " + responseCode));
+                }
+            } catch (Exception e) {
+                Log.e("ApiClient", "addTask ошибка: " + e.getMessage());
+                handler.post(() -> callback.onError(e.getMessage()));
+            } finally {
+                if (conn != null) conn.disconnect();
+            }
+        });
+    }
+
+    public void updateTask(int id, String priority, ApiCallback callback) {
+        executeSafe(() -> {
+            HttpURLConnection conn = null;
+            try {
+                JSONObject json = new JSONObject();
+                json.put("id", id);
+                json.put("priority", priority);
+
+                URL url = new URL(BASE_URL + "update_task.php");
+                conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json");
+                conn.setDoOutput(true);
+                conn.setConnectTimeout(15000);
+                conn.setReadTimeout(15000);
+
+                OutputStream os = conn.getOutputStream();
+                os.write(json.toString().getBytes("UTF-8"));
+                os.close();
+
+                final int responseCode = conn.getResponseCode();
+                if (responseCode == 200) {
+                    Scanner s = new Scanner(conn.getInputStream(), "UTF-8").useDelimiter("\\A");
+                    final String response = s.hasNext() ? s.next() : "";
+                    s.close();
+                    handler.post(() -> callback.onSuccess(response));
+                } else {
+                    handler.post(() -> callback.onError("HTTP " + responseCode));
+                }
+            } catch (Exception e) {
+                handler.post(() -> callback.onError(e.getMessage()));
+            } finally {
+                if (conn != null) conn.disconnect();
+            }
+        });
+    }
+
+    public void deleteTask(int id, ApiCallback callback) {
+        executeSafe(() -> {
+            HttpURLConnection conn = null;
+            try {
+                JSONObject json = new JSONObject();
+                json.put("id", id);
+
+                URL url = new URL(BASE_URL + "delete_task.php");
+                conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json");
+                conn.setDoOutput(true);
+                conn.setConnectTimeout(15000);
+                conn.setReadTimeout(15000);
+
+                OutputStream os = conn.getOutputStream();
+                os.write(json.toString().getBytes("UTF-8"));
+                os.close();
 
                 final int responseCode = conn.getResponseCode();
                 if (responseCode == 200) {

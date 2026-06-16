@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -11,28 +12,35 @@ import android.widget.*;
 import androidx.appcompat.app.AlertDialog;
 import androidx.cardview.widget.CardView;
 import androidx.fragment.app.Fragment;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
+
+import com.example.salestracker.Task;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
 public class DashboardFragment extends Fragment {
 
-    private TextView tvEmployeeName, tvAvatar, tvOfficeStatus, tvQuickEmployeesText;
+    private TextView tvEmployeeName, tvAvatar, tvOfficeStatus;
     private GridLayout gridMetrics;
     private LinearLayout containerTasks;
     private TextView btnAddTask;
+    private SwipeRefreshLayout swipeRefresh;
     private ApiClient apiClient;
     private int currentOfficeId;
     private String currentEmployee;
     private String currentUserRole;
     private int currentYear, currentMonth, currentDay, daysInMonth;
+    private int currentEmployeeId;
 
     // Категории показателей
     private String[] displayCategories = {"SIM", "Аксессуары", "Товарка", "ШПД", "Адаптеры", "Финансовые услуги"};
@@ -41,6 +49,8 @@ public class DashboardFragment extends Fragment {
 
     private Map<String, Integer> monthlyPlans = new HashMap<>();
     private Map<String, Integer> todaySales = new HashMap<>();
+    private Map<String, Integer> monthSales = new HashMap<>();
+    private List<Task> taskList = new ArrayList<>();
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -50,8 +60,7 @@ public class DashboardFragment extends Fragment {
         loadUserData();
         setupClickListeners();
         loadDashboardData();
-        checkOfficeStatus();
-        setupStatusClickListener();
+        loadTasks();
 
         return view;
     }
@@ -60,10 +69,10 @@ public class DashboardFragment extends Fragment {
         tvEmployeeName = view.findViewById(R.id.tvEmployeeName);
         tvAvatar = view.findViewById(R.id.tvAvatarDashboard);
         tvOfficeStatus = view.findViewById(R.id.tvOfficeStatus);
-        tvQuickEmployeesText = view.findViewById(R.id.tvQuickEmployeesText);
         gridMetrics = view.findViewById(R.id.gridMetrics);
         containerTasks = view.findViewById(R.id.containerTasks);
         btnAddTask = view.findViewById(R.id.btnAddTask);
+        swipeRefresh = view.findViewById(R.id.swipeRefresh);
 
         tvAvatar.setOnClickListener(v -> showExitMenu());
 
@@ -73,6 +82,10 @@ public class DashboardFragment extends Fragment {
         view.findViewById(R.id.btnQuickReports).setOnClickListener(v -> navigateToReports());
         view.findViewById(R.id.btnQuickRating).setOnClickListener(v -> navigateToRating());
         view.findViewById(R.id.btnQuickTasks).setOnClickListener(v -> navigateToTasks());
+
+        if (swipeRefresh != null) {
+            swipeRefresh.setOnRefreshListener(() -> refreshData());
+        }
     }
 
     private void loadUserData() {
@@ -81,25 +94,27 @@ public class DashboardFragment extends Fragment {
         currentEmployee = prefs.getString("employee_name", "Анна");
         currentOfficeId = prefs.getInt("office_id", 0);
         currentUserRole = prefs.getString("user_role", "seller");
+        currentEmployeeId = prefs.getInt("employee_id", 0);
 
         String firstName = currentEmployee.split(" ")[0];
         tvEmployeeName.setText("Добрый день, " + firstName);
         tvAvatar.setText(firstName.substring(0, 1));
-
-        // Меняем текст кнопки "Сотрудники" на "Офисы" для Owner/RGO
-        if (tvQuickEmployeesText != null) {
-            if (currentUserRole.equals("owner") || currentUserRole.equals("rgo")) {
-                tvQuickEmployeesText.setText("ОФИСЫ");
-            } else {
-                tvQuickEmployeesText.setText("СОТРУДНИКИ");
-            }
-        }
 
         Calendar cal = Calendar.getInstance();
         currentYear = cal.get(Calendar.YEAR);
         currentMonth = cal.get(Calendar.MONTH) + 1;
         currentDay = cal.get(Calendar.DAY_OF_MONTH);
         daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
+    }
+
+    private void refreshData() {
+        loadDashboardData();
+        loadTasks();
+        checkOfficeStatus();
+        if (swipeRefresh != null) {
+            swipeRefresh.setRefreshing(false);
+        }
+        Toast.makeText(getContext(), "Данные обновлены", Toast.LENGTH_SHORT).show();
     }
 
     private void loadDashboardData() {
@@ -116,18 +131,42 @@ public class DashboardFragment extends Fragment {
                             int value = plansObj.optInt(dbCategory, 0);
                             monthlyPlans.put(dbCategory, value);
                         }
-
-                        loadTodaySales();
+                        loadMonthSales();
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
                     showStubData();
                 }
             }
-
             @Override
             public void onError(String error) {
                 showStubData();
+            }
+        });
+    }
+
+    private void loadMonthSales() {
+        apiClient.getMonthSales(currentOfficeId, currentYear, currentMonth, new ApiClient.ApiCallback() {
+            @Override
+            public void onSuccess(String response) {
+                try {
+                    JSONObject obj = new JSONObject(response);
+                    if (obj.getString("status").equals("success")) {
+                        JSONObject salesObj = obj.getJSONObject("sales");
+                        monthSales.clear();
+                        for (String dbCategory : dbCategories) {
+                            int value = salesObj.optInt(dbCategory, 0);
+                            monthSales.put(dbCategory, value);
+                        }
+                        loadTodaySales();
+                    }
+                } catch (Exception e) {
+                    loadTodaySales();
+                }
+            }
+            @Override
+            public void onError(String error) {
+                loadTodaySales();
             }
         });
     }
@@ -187,7 +226,6 @@ public class DashboardFragment extends Fragment {
                     showStubData();
                 }
             }
-
             @Override
             public void onError(String error) {
                 showStubData();
@@ -205,11 +243,12 @@ public class DashboardFragment extends Fragment {
 
             int monthlyPlan = monthlyPlans.getOrDefault(dbCategory, 0);
             int soldToday = todaySales.getOrDefault(dbCategory, 0);
+            int soldMonth = monthSales.getOrDefault(dbCategory, 0);
 
             int daysLeft = daysInMonth - currentDay + 1;
             if (daysLeft < 1) daysLeft = 1;
 
-            int remainingPlan = monthlyPlan - (soldToday * currentDay);
+            int remainingPlan = monthlyPlan - soldMonth;
             if (remainingPlan < 0) remainingPlan = 0;
 
             int dailyPlan = remainingPlan / daysLeft;
@@ -267,6 +306,8 @@ public class DashboardFragment extends Fragment {
         }
 
         displayTasks();
+        checkOfficeStatus();
+        setupStatusClickListener();
     }
 
     private String getIconForCategory(String category) {
@@ -291,17 +332,51 @@ public class DashboardFragment extends Fragment {
         gridMetrics.addView(card);
     }
 
-    private void displayTasks() {
-        String[][] tasks = {
-                {"Обзвонить 10 клиентов", "до 18:00", "urgent"},
-                {"Сдать отчёт по продажам", "до 19:00", "important"},
-                {"Подготовить презентацию", "завтра", "normal"},
-                {"Провести планёрку", "выполнено", "done"}
-        };
+    // ==================== ЗАДАЧИ ====================
 
+    private void loadTasks() {
+        apiClient.getTasks(currentOfficeId, currentUserRole, new ApiClient.ApiCallback() {
+            @Override
+            public void onSuccess(String response) {
+                try {
+                    JSONObject obj = new JSONObject(response);
+                    JSONArray arr = obj.getJSONArray("tasks");
+                    taskList.clear();
+                    for (int i = 0; i < arr.length(); i++) {
+                        JSONObject task = arr.getJSONObject(i);
+                        Task t = new Task(
+                                task.getInt("id"),
+                                task.getString("title"),
+                                task.optString("deadline", ""),
+                                task.getString("priority")
+                        );
+                        taskList.add(t);
+                    }
+                    displayTasks();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+            @Override
+            public void onError(String error) {}
+        });
+    }
+
+    private void displayTasks() {
         containerTasks.removeAllViews();
 
-        for (String[] task : tasks) {
+        if (taskList.isEmpty()) {
+            TextView tvEmpty = new TextView(getContext());
+            tvEmpty.setText("Нет задач");
+            tvEmpty.setTextSize(12);
+            tvEmpty.setTextColor(0xFF999999);
+            tvEmpty.setPadding(16, 16, 16, 16);
+            tvEmpty.setGravity(Gravity.CENTER);
+            containerTasks.addView(tvEmpty);
+            return;
+        }
+
+        for (Task task : taskList) {
             View taskView = LayoutInflater.from(getContext()).inflate(R.layout.item_task_card, containerTasks, false);
 
             View colorStrip = taskView.findViewById(R.id.colorStrip);
@@ -310,23 +385,135 @@ public class DashboardFragment extends Fragment {
             CheckBox cbComplete = taskView.findViewById(R.id.cbComplete);
 
             int color;
-            if (task[2].equals("urgent")) color = 0xFFEF4444;
-            else if (task[2].equals("important")) color = 0xFFF59E0B;
-            else if (task[2].equals("normal")) color = 0xFF9CA3AF;
-            else color = 0xFF10B981;
+            switch (task.getPriority()) {
+                case "urgent": color = 0xFFEF4444; break;
+                case "important": color = 0xFFF59E0B; break;
+                case "normal": color = 0xFF9CA3AF; break;
+                case "done": color = 0xFF10B981; break;
+                default: color = 0xFF9CA3AF;
+            }
 
             colorStrip.setBackgroundColor(color);
-            tvTitle.setText(task[0]);
-            tvDeadline.setText(task[1]);
+            tvTitle.setText(task.getTitle());
 
-            if (task[2].equals("done")) {
+            String deadlineText = task.getDeadline();
+            if (deadlineText != null && !deadlineText.isEmpty()) {
+                tvDeadline.setText("до " + formatDate(deadlineText));
+            } else {
+                tvDeadline.setText("");
+            }
+
+            if (task.getPriority().equals("done")) {
                 cbComplete.setChecked(true);
                 taskView.setAlpha(0.5f);
             }
 
+            cbComplete.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                String newPriority = isChecked ? "done" : "normal";
+                apiClient.updateTask(task.getId(), newPriority, new ApiClient.ApiCallback() {
+                    @Override
+                    public void onSuccess(String response) {
+                        task.setPriority(newPriority);
+                        loadTasks();
+                    }
+                    @Override
+                    public void onError(String error) {}
+                });
+            });
+
             containerTasks.addView(taskView);
         }
     }
+
+    private void showAddTaskDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+        View view = LayoutInflater.from(getContext()).inflate(R.layout.dialog_add_task, null);
+
+        EditText etTitle = view.findViewById(R.id.etTaskTitle);
+        EditText etDeadline = view.findViewById(R.id.etTaskDeadline);
+        Spinner spinnerPriority = view.findViewById(R.id.spinnerPriority);
+
+        etDeadline.setHint("ДД.ММ.ГГГГ (необязательно)");
+
+        String[] priorities = {"normal", "important", "urgent"};
+        String[] priorityNames = {"Обычная", "Важная", "Срочная"};
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_dropdown_item, priorityNames);
+        spinnerPriority.setAdapter(adapter);
+
+        builder.setTitle("Добавить задачу")
+                .setView(view)
+                .setPositiveButton("Добавить", (dialog, which) -> {
+                    String title = etTitle.getText().toString().trim();
+                    String deadline = etDeadline.getText().toString().trim();
+                    String priority = priorities[spinnerPriority.getSelectedItemPosition()];
+
+                    if (!title.isEmpty()) {
+                        String deadlineFormatted = deadline.isEmpty() ? null : convertToServerDate(deadline);
+                        apiClient.addTask(currentOfficeId, title, deadlineFormatted, priority, currentEmployeeId, new ApiClient.ApiCallback() {
+                            @Override
+                            public void onSuccess(String response) {
+                                try {
+                                    JSONObject obj = new JSONObject(response);
+                                    if (obj.getString("status").equals("success")) {
+                                        JSONArray arr = obj.getJSONArray("tasks");
+                                        taskList.clear();
+                                        for (int i = 0; i < arr.length(); i++) {
+                                            JSONObject task = arr.getJSONObject(i);
+                                            Task t = new Task(
+                                                    task.getInt("id"),
+                                                    task.getString("title"),
+                                                    task.optString("deadline", ""),
+                                                    task.getString("priority")
+                                            );
+                                            taskList.add(t);
+                                        }
+                                        displayTasks();
+                                        Toast.makeText(getContext(), "✅ Задача добавлена", Toast.LENGTH_SHORT).show();
+                                    }
+                                } catch (Exception e) {
+                                    loadTasks();
+                                }
+                            }
+                            @Override
+                            public void onError(String error) {
+                                Toast.makeText(getContext(), "❌ Ошибка: " + error, Toast.LENGTH_SHORT).show();
+                            }
+                        });
+                    } else {
+                        Toast.makeText(getContext(), "Введите название задачи", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
+    }
+
+    private String formatDate(String date) {
+        if (date == null || date.isEmpty()) return "";
+        try {
+            String[] parts = date.split("-");
+            if (parts.length == 3) {
+                return parts[2] + "." + parts[1] + "." + parts[0];
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return date;
+    }
+
+    private String convertToServerDate(String date) {
+        if (date == null || date.isEmpty()) return null;
+        try {
+            String[] parts = date.split("\\.");
+            if (parts.length == 3) {
+                return parts[2] + "-" + parts[1] + "-" + parts[0];
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    // ==================== НАВИГАЦИЯ ====================
 
     private void showStubData() {
         gridMetrics.removeAllViews();
@@ -388,7 +575,11 @@ public class DashboardFragment extends Fragment {
 
     private void setupClickListeners() {
         btnAddTask.setOnClickListener(v -> {
-            Toast.makeText(getContext(), "Добавление задачи", Toast.LENGTH_SHORT).show();
+            if (currentUserRole.equals("owner") || currentUserRole.equals("rgo") || currentUserRole.equals("dm")) {
+                showAddTaskDialog();
+            } else {
+                Toast.makeText(getContext(), "Нет прав для добавления задач", Toast.LENGTH_SHORT).show();
+            }
         });
     }
 
@@ -428,10 +619,9 @@ public class DashboardFragment extends Fragment {
         Toast.makeText(getContext(), "Задачи", Toast.LENGTH_SHORT).show();
     }
 
-    // ==================== МЕТОДЫ ДЛЯ СТАТУСА ОФИСА ====================
+    // ==================== СТАТУС ОФИСА ====================
 
     private void checkOfficeStatus() {
-        // Для Owner/RGO - скрываем статус
         if (currentUserRole.equals("owner") || currentUserRole.equals("rgo")) {
             if (tvOfficeStatus != null) {
                 tvOfficeStatus.setVisibility(View.GONE);
@@ -439,7 +629,6 @@ public class DashboardFragment extends Fragment {
             return;
         }
 
-        // Для DM и сотрудников - показываем статус
         if (currentUserRole.equals("dm") || currentUserRole.equals("seller") || currentUserRole.equals("senior_seller")) {
             String today = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
 
@@ -460,7 +649,6 @@ public class DashboardFragment extends Fragment {
                         updateOfficeStatusUI(false, false);
                     }
                 }
-
                 @Override
                 public void onError(String error) {
                     updateOfficeStatusUI(false, false);
@@ -516,7 +704,6 @@ public class DashboardFragment extends Fragment {
                                 e.printStackTrace();
                             }
                         }
-
                         @Override
                         public void onError(String error) {
                             Toast.makeText(getContext(), "Ошибка: " + error, Toast.LENGTH_SHORT).show();
